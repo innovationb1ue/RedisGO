@@ -21,19 +21,19 @@ Code base adapted from
 * Support atomic operation for some needed commands(like INCR, DECR, INCRBY, MSET, SMOVE, etc.)
 
 ## Usage
-Build thinRedis from source code:
+Build RedisGO from source code:
 ```bash
-$ go build -o thinRedis main.go
+$ go build -o RedisGO main.go
 ```
-Start thinRedis server:
+Start RedisGO server:
 ```bash
-$ ./thinRedis
+$ ./RedisGO
 [info][server.go:26] 2022/09/08 13:23:50 [Server Listen at  127.0.0.1 : 6379]
 ```
 Use start option commands or config file to change default settings:
 ```bash 
-$ ./thinRedis -h
-Usage of ./thinredis:
+$ ./RedisGO -h
+Usage of ./RedisGO:
   -config string
         Appoint a config file: such as /etc/redis.conf
   -host string
@@ -45,17 +45,17 @@ Usage of ./thinredis:
   -port int
         Bind a listening port: default is 6379 (default 6379)
 ```
-## Communication with thinRedis server
-Any redis client can communicate with thinRedis server.  
-For example, use redis-cli to communicate with thinRedis server:
+## Communication with RedisGO server
+Any redis client can communicate with RedisGO server.  
+For example, use redis-cli to communicate with RedisGO server:
 
 ```bash
-# start a thinRedis server listening at 12345 port
+# start a RedisGO server listening at 12345 port
 $ ./RedisGO -port 12345
 [info][server.go:26] 2022/09/08 13:31:47 [Server Listen at  127.0.0.1 : 12345]
                       ...
 
-# start a redis-cli and connect to thinRedis server
+# start a redis-cli and connect to RedisGO server
 $ redis-cli -p 12345
 127.0.0.1:12345> PING
 PONG
@@ -114,7 +114,7 @@ mset: 109289.62 requests per second
 ```
 
 ## Support Commands
-All commands used as [redis commands](https://redis.io/commands/). You can use any redis client to communicate with thinRedis.
+All commands used as [redis commands](https://redis.io/commands/). You can use any redis client to communicate with RedisGO.
 
 | key     | string      | list   | set         | hash         |
 |---------|-------------|--------|-------------|--------------|
