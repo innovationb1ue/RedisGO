@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/innovationb1ue/RedisGO/util"
-	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/innovationb1ue/RedisGO/logger"
 	"github.com/innovationb1ue/RedisGO/resp"
@@ -774,9 +774,13 @@ func lMoveList(m *MemDb, cmd [][]byte) resp.RedisData {
 }
 
 func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
+	// at least 3 args like "BLPOP key timeout"
+	if len(cmd) < 3 {
+		return resp.MakeStringData("ERR wrong number of arguments for 'blpop' command")
+	}
 	// last arg is block timeout
-	timeout, err := strconv.ParseFloat(string(cmd[len(cmd)-1]), 64)
-	log.Println("should set timeout ", timeout)
+	timeout, err := strconv.Atoi(string(cmd[len(cmd)-1]))
+	timer := time.NewTimer(time.Duration(timeout) * time.Second)
 	if err != nil {
 		return resp.MakeStringData("ERR timeout is not a float or out of range")
 	}
@@ -810,22 +814,27 @@ func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
 	for _, list := range Lists {
 		chanPump.AddIn(list.HasOne)
 	}
-	// todo: think carefully here. even no list is available at the moment this will blocks till one available or till timeout
+	// todo: think carefully here. even no list is available at the moment this will blocks till one available or till ti
 	// start forwarding all list HasOne channels to a single Out channel
 	chanPump.RunForward()
 	// blocks until can read a message from the Pump and get the index of which list sent the msg
-	lIndex := <-chanPump.Out
-	// get the list & list name
-	list := Lists[lIndex]
-	listKey := keyStrings[lIndex]
+	select {
+	// timeout
+	case <-timer.C:
+		return resp.MakeBulkData(nil)
+	case lIndex := <-chanPump.Out:
+		// get the list & list name
+		list := Lists[lIndex]
+		listKey := keyStrings[lIndex]
 
-	m.locks.Lock(listKey)
-	defer m.locks.UnLock(listKey)
+		m.locks.Lock(listKey)
+		defer m.locks.UnLock(listKey)
 
-	// lpop 1 from list
-	val := list.LPop().Val
+		// lpop 1 from list
+		val := list.LPop().Val
+		return resp.MakeBulkData(val)
+	}
 
-	return resp.MakeBulkData(val)
 }
 
 // TODO: brpop from list

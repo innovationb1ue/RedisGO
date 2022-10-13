@@ -8,8 +8,8 @@ all Redis clients.
 
 
 ## Base Works
-Code base adapted from 
-[thinredis](https://github.com/innovationb1ue/RedisGO)
+Code base adapted from this version
+[thinredis](https://github.com/VincentFF/thinredis/tree/86fa648426da7e9c3ff4c04aef1e43f1fdc7b1ac)
 
 
 ## Features

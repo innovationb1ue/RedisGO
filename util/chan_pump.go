@@ -21,6 +21,7 @@ func (p *Pump) AddIn(in <-chan struct{}) {
 
 // RunForward blocks and forwards all inbound channels to a single outbound channel for exactly 1 message.
 func (p *Pump) RunForward() {
+	// chan to stop other listening goroutines
 	msgSent := make(chan struct{})
 	for idx, in := range p.In {
 		in := in
@@ -30,6 +31,7 @@ func (p *Pump) RunForward() {
 			case <-msgSent:
 				return
 			case <-in:
+				// output the index of the available list
 				p.Out <- idx
 				close(msgSent)
 				return
