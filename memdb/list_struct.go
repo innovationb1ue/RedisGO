@@ -1,15 +1,21 @@
 package memdb
 
-import "bytes"
+import (
+	"bytes"
+	"context"
+	"github.com/google/uuid"
+)
+
+type Out chan<- []byte
 
 // List implements a double linked list for redis list
 type List struct {
 	Head *ListNode
 	Tail *ListNode
 	Len  int
-	// receive from this channel will block until there is at least 1 elements in the list
-	// used in blocking commands.
-	HasOne chan struct{}
+	// register subscription functions here. each time an element be added to the list will go through subscribers.
+	LSubscriptions map[string]Out
+	RSubscriptions map[string]Out
 }
 
 type ListNode struct {
@@ -24,11 +30,59 @@ func NewList() *List {
 	head.Next = tail
 	tail.Prev = head
 	return &List{
-		Head:   head,
-		Tail:   tail,
-		Len:    0,
-		HasOne: make(chan struct{}, 10),
+		Head:           head,
+		Tail:           tail,
+		Len:            0,
+		LSubscriptions: make(map[string]Out, 1),
+		RSubscriptions: make(map[string]Out, 1),
 	}
+}
+
+// AddSubscribe add one function to the subscription list
+func (l *List) AddSubscribe(ctx context.Context, out chan<- []byte, direction string) bool {
+	// check arg
+	if direction != "R" && direction != "L" {
+		return false
+	}
+	if direction == "R" {
+		// directly return the value if any element is available
+		if l.Len > 0 {
+			go func() {
+				out <- l.RPop().Val
+			}()
+			return true
+		}
+		subID := uuid.NewString()
+		l.RSubscriptions[subID] = out
+		// clean up func
+		go func() {
+			select {
+			case <-ctx.Done():
+				delete(l.RSubscriptions, subID)
+			}
+		}()
+		return true
+	}
+	if direction == "L" {
+		// directly return the value if any element is available
+		if l.Len > 0 {
+			go func() {
+				out <- l.LPop().Val
+			}()
+			return true
+		}
+		subID := uuid.NewString()
+		l.LSubscriptions[subID] = out
+		// clean up func
+		go func() {
+			select {
+			case <-ctx.Done():
+				delete(l.LSubscriptions, subID)
+			}
+		}()
+		return true
+	}
+	return false
 }
 
 func (l *List) Index(index int) *ListNode {
@@ -69,7 +123,15 @@ func (l *List) LPush(val []byte) {
 	l.Head.Next = node
 	node.Next.Prev = node
 	l.Len++
-	l.HasOne <- struct{}{}
+	// check subscriptions
+	if len(l.LSubscriptions) > 0 {
+		// LPOP and return the val to chan
+		for _, out := range l.LSubscriptions {
+			val := l.LPop().Val
+			out <- val
+			return
+		}
+	}
 }
 
 func (l *List) RPush(val []byte) {
@@ -77,7 +139,15 @@ func (l *List) RPush(val []byte) {
 	l.Tail.Prev = node
 	node.Prev.Next = node
 	l.Len++
-	l.HasOne <- struct{}{}
+	// check subscriptions
+	if len(l.LSubscriptions) > 0 {
+		// RPOP and return the val to chan
+		for _, out := range l.LSubscriptions {
+			val := l.LPop().Val
+			out <- val
+			return
+		}
+	}
 }
 
 func (l *List) LPop() *ListNode {

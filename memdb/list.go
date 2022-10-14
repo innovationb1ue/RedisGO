@@ -3,7 +3,7 @@ package memdb
 import (
 	"bytes"
 	"fmt"
-	"github.com/innovationb1ue/RedisGO/util"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -414,18 +414,22 @@ func lPushList(m *MemDb, cmd [][]byte) resp.RedisData {
 
 	var list *List
 	tem, ok := m.db.Get(key)
+	// no such key, create a list
 	if !ok {
 		list = NewList()
 		m.db.Set(key, list)
 	} else {
+		// try to assert it as a List.
 		list, ok = tem.(*List)
 		if !ok {
 			return resp.MakeErrorData("WRONGTYPE Operation against a key holding the wrong kind of value")
 		}
 	}
+	// push args to the list
 	for i := 2; i < len(cmd); i++ {
 		list.LPush(cmd[i])
 	}
+	// return the length of the list
 	return resp.MakeIntData(int64(list.Len))
 }
 
@@ -776,65 +780,61 @@ func lMoveList(m *MemDb, cmd [][]byte) resp.RedisData {
 func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
 	// at least 3 args like "BLPOP key timeout"
 	if len(cmd) < 3 {
-		return resp.MakeStringData("ERR wrong number of arguments for 'blpop' command")
+		return resp.MakeErrorData("ERR wrong number of arguments for 'blpop' command")
 	}
 	// last arg is block timeout
 	timeout, err := strconv.Atoi(string(cmd[len(cmd)-1]))
-	timer := time.NewTimer(time.Duration(timeout) * time.Second)
 	if err != nil {
-		return resp.MakeStringData("ERR timeout is not a float or out of range")
+		return resp.MakeErrorData("ERR timeout is not a float or out of range")
 	}
+	var timer *time.Timer
+	if timeout == 0 {
+		timer = time.NewTimer(math.MaxInt)
+	} else {
+		timer = time.NewTimer(time.Duration(timeout) * time.Second)
+	}
+	// query interval (this could be narrowed down to query more frequently but will use more CPU resource)
+	ticker := time.NewTicker(100 * time.Millisecond) // 100ms per query = 10 times per second
+
 	// retrieve all list names
 	keyBytes := cmd[1 : len(cmd)-1]
 	keyStrings := make([]string, 0, len(keyBytes))
 	for _, bStr := range keyBytes {
 		keyStrings = append(keyStrings, string(bStr))
 	}
-	// all named lists
-	Lists := make([]*List, 0)
-	// get all possible lists by keys
-	for _, key := range keyStrings {
-		listTemp, ok := m.db.Get(key)
-		// key doesn't exist
-		if !ok {
-			continue
+
+	// block (will return inside the infinite loop)
+	for {
+		select {
+		// time to query keys
+		case <-ticker.C:
+			for _, key := range keyStrings {
+				// lock db actions
+				m.locks.Lock(key)
+				// get key
+				tmp, ok := m.db.Get(key)
+				// key exist
+				if ok {
+					// assert is List
+					list, isList := tmp.(*List)
+					if isList {
+						// Pop from list
+						node := list.LPop()
+						if node != nil {
+							// find a value. need to manually release the lock since we are leaving this scope
+							m.locks.UnLock(key)
+							return resp.MakeArrayData([]resp.RedisData{resp.MakeStringData(key), resp.MakeBulkData(node.Val)})
+						}
+					}
+				}
+				// will finally release the lock here if nothing available
+				m.locks.UnLock(key)
+			}
+		// timeout
+		case <-timer.C:
+			return resp.MakeBulkData(nil)
 		}
-		// note here, this behavior is different from Redis.
-		// Redis will return possible element while scanning the provided keys from left to right.
-		// Even if some later keys contain different kind of value.
-		// But this will return error whenever encountered wrong kind of value.
-		list, ok := listTemp.(*List)
-		if !ok {
-			return resp.MakeStringData("WRONGTYPE Operation againsta key holding the wrong kind of value")
-		}
-		Lists = append(Lists, list)
 	}
-	// try to receive from any of these chans
-	chanPump := util.NewPump()
-	for _, list := range Lists {
-		chanPump.AddIn(list.HasOne)
-	}
-	// todo: think carefully here. even no list is available at the moment this will blocks till one available or till ti
-	// start forwarding all list HasOne channels to a single Out channel
-	chanPump.RunForward()
-	// blocks until can read a message from the Pump and get the index of which list sent the msg
-	select {
-	// timeout
-	case <-timer.C:
-		return resp.MakeBulkData(nil)
-	case lIndex := <-chanPump.Out:
-		// get the list & list name
-		list := Lists[lIndex]
-		listKey := keyStrings[lIndex]
-
-		m.locks.Lock(listKey)
-		defer m.locks.UnLock(listKey)
-
-		// lpop 1 from list
-		val := list.LPop().Val
-		return resp.MakeBulkData(val)
-	}
-
 }
 
 // TODO: brpop from list

@@ -32,8 +32,8 @@ func (p *Pump) RunForward() {
 				return
 			case <-in:
 				// output the index of the available list
-				p.Out <- idx
 				close(msgSent)
+				p.Out <- idx
 				return
 			}
 		}(in, idx)
