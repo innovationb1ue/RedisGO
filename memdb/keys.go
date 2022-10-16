@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -13,7 +14,7 @@ import (
 
 // keys.go file implements the keys commands of redis
 
-func delKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func delKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "del" {
 		logger.Error("delKey Function: cmdName is not del")
@@ -32,7 +33,7 @@ func delKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(dKey))
 }
 
-func existsKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func existsKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "exists" || len(cmd) < 2 {
 		logger.Error("existsKey Function: cmdName is not exists or command args number is invalid")
@@ -53,7 +54,7 @@ func existsKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(eKey))
 }
 
-func keysKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func keysKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "keys" || len(cmd) != 2 {
 		logger.Error("keysKey Function: cmdName is not keys or cmd length is not 2")
 		return resp.MakeErrorData(fmt.Sprintf("error: keys function get invalid command %s %s", string(cmd[0]), string(cmd[1])))
@@ -71,7 +72,7 @@ func keysKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func expireKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func expireKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "expire" || len(cmd) < 3 || len(cmd) > 4 {
 		logger.Error("expireKey Function: cmdName is not expire or command args number is invalid")
@@ -123,7 +124,7 @@ func expireKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func persistKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func persistKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "persist" || len(cmd) != 2 {
 		logger.Error("persistKey Function: cmdName is not persist or command args number is invalid")
@@ -140,7 +141,7 @@ func persistKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func ttlKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func ttlKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "ttl" || len(cmd) != 2 {
 		logger.Error("ttlKey Function: cmdName is not ttl or command args number is invalid")
@@ -165,7 +166,7 @@ func ttlKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(ttl.(int64) - now)
 }
 
-func typeKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func typeKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "type" || len(cmd) != 2 {
 		logger.Error("typeKey Function: cmdName is not type or command args number is invalid")
@@ -198,7 +199,7 @@ func typeKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeErrorData("unknown error: server error")
 }
 
-func renameKey(m *MemDb, cmd [][]byte) resp.RedisData {
+func renameKey(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdName := string(cmd[0])
 	if strings.ToLower(cmdName) != "rename" || len(cmd) != 3 {
 		logger.Error("renameKey Function: cmdName is not rename or command args number is invalid")
@@ -225,7 +226,7 @@ func renameKey(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func pingKeys(m *MemDb, cmd [][]byte) resp.RedisData {
+func pingKeys(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) > 2 {
 		return resp.MakeErrorData("error: wrong number of arguments for 'ping' command")
 	}

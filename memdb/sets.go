@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"math"
+	"net"
 	"strconv"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/innovationb1ue/RedisGO/resp"
 )
 
-func sAddSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sAddSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) < 3 {
 		return resp.MakeErrorData("wrong number of arguments for 'sadd' command")
 	}
@@ -38,7 +39,7 @@ func sAddSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func sCardSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sCardSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "scard" {
 		logger.Error("sCardSet Function: cmdName is not scard")
 		return resp.MakeErrorData("server error")
@@ -69,7 +70,7 @@ func sCardSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func sDiffSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sDiffSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sdiff" {
 		logger.Error("sDiffSet Function: cmdName is not sdiff")
 		return resp.MakeErrorData("server error")
@@ -129,7 +130,7 @@ func sDiffSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func sDiffStoreSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sDiffStoreSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sdiffstore" {
 		logger.Error("sDiffStoreSet Function: cmdName is not sdiffstore")
 		return resp.MakeErrorData("server error")
@@ -208,7 +209,7 @@ func sDiffStoreSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(diffRes.Len()))
 }
 
-func sInterSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sInterSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sinter" {
 		logger.Error("sInterSet Function: cmdName is not sinter")
 		return resp.MakeErrorData("server error")
@@ -261,7 +262,7 @@ func sInterSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func sInterStoreSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sInterStoreSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sinterstore" {
 		logger.Error("sInterStoreSet Function: cmdName is not sinterstore")
 		return resp.MakeErrorData("server error")
@@ -339,7 +340,7 @@ func sInterStoreSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(interSet.Len()))
 }
 
-func sIsMemberSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sIsMemberSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sismember" {
 		logger.Error("sIsMemberSet Function: cmdName is not sismember")
 		return resp.MakeErrorData("server error")
@@ -373,7 +374,7 @@ func sIsMemberSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(0)
 }
 
-func sMembersSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sMembersSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) != 2 {
 		return resp.MakeErrorData("wrong number of arguments for 'smembers' command")
 	}
@@ -403,7 +404,7 @@ func sMembersSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func sMoveSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sMoveSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) != 4 {
 		return resp.MakeErrorData("wrong number of arguments for 'smove' command")
 	}
@@ -457,7 +458,7 @@ func sMoveSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(1)
 }
 
-func sPopSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sPopSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "spop" {
 		logger.Error("sPopSet Function: cmdName is not spop")
 		return resp.MakeErrorData("server error")
@@ -523,7 +524,7 @@ func sPopSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func sRandMemberSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sRandMemberSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 
 	if len(cmd) != 2 && len(cmd) != 3 {
 		return resp.MakeErrorData("wrong number of arguments for 'srandmember' command")
@@ -572,7 +573,7 @@ func sRandMemberSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func sRemSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sRemSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "srem" {
 		logger.Error("sRemSet Function: cmdName is not srem")
 		return resp.MakeErrorData("server error")
@@ -617,7 +618,7 @@ func sRemSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func sUnionSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sUnionSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sunion" {
 		logger.Error("sUnionSet Function: cmdName is not sunion")
 		return resp.MakeErrorData("server error")
@@ -668,7 +669,7 @@ func sUnionSet(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func sUnionStoreSet(m *MemDb, cmd [][]byte) resp.RedisData {
+func sUnionStoreSet(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "sunionstore" {
 		logger.Error("sUnionStoreSet Function: cmdName is not sunionstore")
 		return resp.MakeErrorData("server error")

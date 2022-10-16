@@ -1,6 +1,7 @@
 package memdb
 
 import (
+	"net"
 	"strings"
 	"time"
 
@@ -13,21 +14,24 @@ import (
 // All key:value pairs are stored in db
 // All ttl keys are stored in ttlKeys
 // locks is used to lock a key for db to ensure some atomic operations
+// SubChans are a independent concurrent map of channel shards used in PUB/SUB commands
 type MemDb struct {
-	db      *ConcurrentMap
-	ttlKeys *ConcurrentMap
-	locks   *Locks
+	db       *ConcurrentMap
+	ttlKeys  *ConcurrentMap
+	locks    *Locks
+	SubChans *ChanMap
 }
 
 func NewMemDb() *MemDb {
 	return &MemDb{
-		db:      NewConcurrentMap(config.Configures.ShardNum),
-		ttlKeys: NewConcurrentMap(config.Configures.ShardNum),
-		locks:   NewLocks(config.Configures.ShardNum * 2),
+		db:       NewConcurrentMap(config.Configures.ShardNum),
+		ttlKeys:  NewConcurrentMap(config.Configures.ShardNum),
+		locks:    NewLocks(config.Configures.ShardNum * 2),
+		SubChans: NewChanMap(config.Configures.ShardNum),
 	}
 }
 
-func (m *MemDb) ExecCommand(cmd [][]byte) resp.RedisData {
+func (m *MemDb) ExecCommand(cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) == 0 {
 		return nil
 	}
@@ -38,7 +42,7 @@ func (m *MemDb) ExecCommand(cmd [][]byte) resp.RedisData {
 	if !ok {
 		res = resp.MakeErrorData("ERR unknown command", cmdName)
 	} else {
-		res = command.executor(m, cmd)
+		res = command.executor(m, cmd, conn)
 	}
 	return res
 }

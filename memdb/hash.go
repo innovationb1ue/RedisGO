@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 )
 
 // hash.go file implements the hash commands of redis
-func hDelHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hDelHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hdel" {
 		logger.Error("hDelHash: command name is not hdel")
 		return resp.MakeErrorData("server error")
@@ -52,7 +53,7 @@ func hDelHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func hExistsHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hExistsHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hexists" {
 		logger.Error("hExistsHash: command name is not hexists")
 		return resp.MakeErrorData("server error")
@@ -86,7 +87,7 @@ func hExistsHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(0)
 }
 
-func hGetHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hGetHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hget" {
 		logger.Error("hGetHash: command name is not hget")
 		return resp.MakeErrorData("server error")
@@ -119,7 +120,7 @@ func hGetHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeBulkData(res)
 }
 
-func hGetAllHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hGetAllHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hgetall" {
 		logger.Error("hGetAllHash: command name is not hgetall")
 		return resp.MakeErrorData("server error")
@@ -154,7 +155,7 @@ func hGetAllHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func hIncrByHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hIncrByHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hincrby" {
 		logger.Error("hIncrByHash: command name is not hincrby")
 		return resp.MakeErrorData("server error")
@@ -197,7 +198,7 @@ func hIncrByHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func hIncrByFloatHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hIncrByFloatHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hincrbyfloat" {
 		logger.Error("hIncrByFloatHash: command name is not hincrbyfloat")
 		return resp.MakeErrorData("server error")
@@ -237,7 +238,7 @@ func hIncrByFloatHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeBulkData([]byte(strconv.FormatFloat(res, 'f', -1, 64)))
 }
 
-func hKeysHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hKeysHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hkeys" {
 		logger.Error("hKeysHash: command name is not hkeys")
 		return resp.MakeErrorData("server error")
@@ -271,7 +272,7 @@ func hKeysHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func hLenHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hLenHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hlen" {
 		logger.Error("hLenHash: command name is not hlen")
 		return resp.MakeErrorData("server error")
@@ -301,7 +302,7 @@ func hLenHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func hMGetHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hMGetHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hmget" {
 		logger.Error("hMGetHash: command name is not hmget")
 		return resp.MakeErrorData("server error")
@@ -340,7 +341,7 @@ func hMGetHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func hSetHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hSetHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hset" {
 		logger.Error("hMSetHash: command name is not hset")
 		return resp.MakeErrorData("server error")
@@ -376,7 +377,7 @@ func hSetHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func hSetNxHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hSetNxHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hsetnx" {
 		logger.Error("hSetNxHash: command name is not hsetnx")
 		return resp.MakeErrorData("server error")
@@ -415,7 +416,7 @@ func hSetNxHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(1)
 }
 
-func hValsHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hValsHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hvals" {
 		logger.Error("hValsHash: command name is not hvals")
 		return resp.MakeErrorData("server error")
@@ -449,7 +450,7 @@ func hValsHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func hStrLenHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hStrLenHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hstrlen" {
 		logger.Error("hStrLenHash: command name is not hstrlen")
 		return resp.MakeErrorData("server error")
@@ -483,7 +484,7 @@ func hStrLenHash(m *MemDb, cmd [][]byte) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func hRandFieldHash(m *MemDb, cmd [][]byte) resp.RedisData {
+func hRandFieldHash(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "hrandfield" {
 		logger.Error("hRandFieldHash: command name is not hrandfield")
 		return resp.MakeErrorData("server error")

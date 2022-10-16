@@ -18,7 +18,7 @@ func TestDelKey(t *testing.T) {
 	memdb.db.Set("b", "b")
 	memdb.ttlKeys.Set("b", time.Now().Unix()+10)
 
-	del_a := delKey(memdb, [][]byte{[]byte("del"), []byte("a"), []byte("b")})
+	del_a := delKey(memdb, [][]byte{[]byte("del"), []byte("a"), []byte("b")}, nil)
 
 	if !bytes.Equal(del_a.ToBytes(), []byte(":2\r\n")) {
 		t.Error("del reply is not correct")
@@ -37,7 +37,7 @@ func TestExpireKey(t *testing.T) {
 	memdb.db.Set("a", "a")
 	memdb.db.Set("b", "b")
 
-	expire_a := expireKey(memdb, [][]byte{[]byte("expire"), []byte("a"), []byte("100"), []byte("nx")})
+	expire_a := expireKey(memdb, [][]byte{[]byte("expire"), []byte("a"), []byte("100"), []byte("nx")}, nil)
 	if !bytes.Equal(expire_a.ToBytes(), []byte(":1\r\n")) {
 		t.Error("expire reply is not correct")
 	}
@@ -45,7 +45,7 @@ func TestExpireKey(t *testing.T) {
 	if attl.(int64)-time.Now().Unix() > 100 || attl.(int64)-time.Now().Unix() < 99 {
 		t.Error("ttl set incorrect")
 	}
-	expire_a1 := expireKey(memdb, [][]byte{[]byte("expire"), []byte("a"), []byte("1000"), []byte("xx")})
+	expire_a1 := expireKey(memdb, [][]byte{[]byte("expire"), []byte("a"), []byte("1000"), []byte("xx")}, nil)
 	if !bytes.Equal(expire_a1.ToBytes(), []byte(":1\r\n")) {
 		t.Error("expire reply is not correct")
 	}
@@ -54,7 +54,7 @@ func TestExpireKey(t *testing.T) {
 		t.Error("ttl set incorrect")
 	}
 
-	expire_b := expireKey(memdb, [][]byte{[]byte("expire"), []byte("b"), []byte("100")})
+	expire_b := expireKey(memdb, [][]byte{[]byte("expire"), []byte("b"), []byte("100")}, nil)
 	if !bytes.Equal(expire_b.ToBytes(), []byte(":1\r\n")) {
 		t.Error("expire reply is not correct")
 	}
@@ -63,7 +63,7 @@ func TestExpireKey(t *testing.T) {
 		t.Error("ttl set incorrect")
 	}
 
-	expire_b1 := expireKey(memdb, [][]byte{[]byte("expire"), []byte("b"), []byte("1000"), []byte("gt")})
+	expire_b1 := expireKey(memdb, [][]byte{[]byte("expire"), []byte("b"), []byte("1000"), []byte("gt")}, nil)
 	if !bytes.Equal(expire_b1.ToBytes(), []byte(":1\r\n")) {
 		t.Error("expire reply is not correct")
 	}

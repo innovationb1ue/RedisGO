@@ -14,20 +14,22 @@ import (
 var Configures *Config
 
 var (
-	defaultHost     = "127.0.0.1"
-	defaultPort     = 6380
-	defaultLogDir   = "./"
-	defaultLogLevel = "info"
-	defaultShardNum = 1024
+	defaultHost           = "127.0.0.1"
+	defaultPort           = 6380
+	defaultLogDir         = "./"
+	defaultLogLevel       = "info"
+	defaultShardNum       = 1024
+	defaultChanBufferSize = 10
 )
 
 type Config struct {
-	ConfFile string
-	Host     string
-	Port     int
-	LogDir   string
-	LogLevel string
-	ShardNum int
+	ConfFile       string
+	Host           string
+	Port           int
+	LogDir         string
+	LogLevel       string
+	ShardNum       int
+	ChanBufferSize int
 }
 
 type CfgError struct {
@@ -42,8 +44,9 @@ func flagInit(cfg *Config) {
 	flag.StringVar(&(cfg.ConfFile), "config", "", "Appoint a config file: such as /etc/redis.conf")
 	flag.StringVar(&(cfg.Host), "host", defaultHost, "Bind host ip: default is 127.0.0.1")
 	flag.IntVar(&(cfg.Port), "port", defaultPort, "Bind a listening port: default is 6379")
-	flag.StringVar(&(cfg.LogDir), "logdir", defaultLogDir, "Set log directory: default is /tmp")
-	flag.StringVar(&(cfg.LogLevel), "loglevel", defaultLogLevel, "Set log level: default is info")
+	flag.StringVar(&(cfg.LogDir), "logdir", defaultLogDir, "Create log directory: default is /tmp")
+	flag.StringVar(&(cfg.LogLevel), "loglevel", defaultLogLevel, "Create log level: default is info")
+	flag.IntVar(&(cfg.ChanBufferSize), "chanBufSize", defaultChanBufferSize, "set the buffer size of channels in PUB/SUB commands. ")
 }
 
 // Setup initialize configs and do some validation checking.

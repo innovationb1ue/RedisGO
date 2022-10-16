@@ -18,7 +18,7 @@ func TestSetString(t *testing.T) {
 	mem := NewMemDb()
 
 	// test set
-	res := setString(mem, [][]byte{[]byte("set"), []byte("a"), []byte("a")})
+	res := setString(mem, [][]byte{[]byte("set"), []byte("a"), []byte("a")}, nil)
 	if !bytes.Equal(res.ToBytes(), []byte("+OK\r\n")) {
 		t.Error("set reply error")
 	}
@@ -28,7 +28,7 @@ func TestSetString(t *testing.T) {
 	}
 
 	// test opt xx and ex
-	res = setString(mem, [][]byte{[]byte("set"), []byte("a"), []byte("b"), []byte("xx"), []byte("ex"), []byte("100")})
+	res = setString(mem, [][]byte{[]byte("set"), []byte("a"), []byte("b"), []byte("xx"), []byte("ex"), []byte("100")}, nil)
 	if !bytes.Equal(res.ToBytes(), []byte("+OK\r\n")) {
 		t.Error("set reply error")
 	}
@@ -42,7 +42,7 @@ func TestSetString(t *testing.T) {
 	}
 
 	// test opt keepttl
-	res = setString(mem, [][]byte{[]byte("set"), []byte("a"), []byte("c"), []byte("get"), []byte("keepttl")})
+	res = setString(mem, [][]byte{[]byte("set"), []byte("a"), []byte("c"), []byte("get"), []byte("keepttl")}, nil)
 	if !bytes.Equal(res.ToBytes(), []byte("$1\r\nb\r\n")) {
 		t.Error("set reply error")
 	}

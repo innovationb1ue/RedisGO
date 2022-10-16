@@ -46,7 +46,7 @@ func Start(cfg *config.Config) error {
 			clients <- conn
 		}
 	}()
-
+	// server event loop
 	for {
 		select {
 		// spawn a goroutine to handle client commands

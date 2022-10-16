@@ -48,6 +48,7 @@ func (m *ConcurrentMap) getShard(key string) *shard {
 	return m.table[m.getKeyPos(key)]
 }
 
+// Set sets a key to the value.
 func (m *ConcurrentMap) Set(key string, value any) int {
 	added := 0
 	shard := m.getShard(key)

@@ -58,7 +58,8 @@ func (h *Handler) Handle(conn net.Conn) {
 		// extract [][]bytes command
 		cmd := arrayData.ToCommand()
 		// run the string command
-		res := h.memDb.ExecCommand(cmd)
+		// also pass connection as an argument since the command may block and return continuous messages
+		res := h.memDb.ExecCommand(cmd, conn)
 		// return result
 		if res != nil {
 			_, err := conn.Write(res.ToBytes())
