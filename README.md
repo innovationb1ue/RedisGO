@@ -89,28 +89,40 @@ list
 
 ## Benchmark
 
-Benchmark result is based on [redis-benchmark](https://redis.io/topics/benchmarks) tool.  
-Testing on ThinkBook Laptop with AMD Ryzen 7 5800H@3.20GHz, 16.0 GB RAM, and on windows 11 wsl2 ubuntu 22.04 system.
 
-`benchmark -c 50 -n 200000 -t get`
+Benchmark result is based on [redis-benchmark](https://redis.io/topics/benchmarks) tool.  
+Testing on MacBook Pro 2021 with M1 pro, 16.0 GB RAM, and on macOS Monterey.
+
+The first one is RedisGO result and the second is from Redis.  
+Note that this result could vary tremendously. Generally we say we reach 80-90% of the original C Redis performance. 
+`benchmark -c 50 -n 200000 -t [get|set|...] -q`
 
 ```text
-get: 168634.06 requests per second
-set: 167644.59 requests per second
-incr: 164068.91 requests per second
-lpush: 165152.77 requests per second
-rpush: 162601.62 requests per second
-lpop: 165152.77 requests per second
-rpop: 165562.92 requests per second
-sadd: 161420.50 requests per second
-hset: 162469.55 requests per second
-spop: 168350.17 requests per second
+SET: 176678.45   requests per second, p50=0.143 msec                    
+GET: 187969.92 requests per second, p50=0.151 msec                    
+INCR: 186741.36 requests per second, p50=0.135 msec                    
+LPUSH: 173611.12 requests per second, p50=0.143 msec                    
+RPUSH: 161943.31 requests per second, p50=0.143 msec                    
+LPOP: 187265.92 requests per second, p50=0.135 msec                    
+RPOP: 186915.88 requests per second, p50=0.135 msec                    
+SADD: 186915.88 requests per second, p50=0.135 msec                    
+HSET: 185873.61 requests per second, p50=0.143 msec                    
+SPOP: 188501.42 requests per second, p50=0.135 msec                    
+MSET (10 keys): 139275.77 requests per second, p50=0.199 msec    
+```
 
-lrange_100: 50620.10 requests per second
-lrange_300: 20132.88 requests per second
-lrange_500: 12051.10 requests per second
-lrange_600: 11992.56 requests per second
-mset: 109289.62 requests per second
+```text
+SET: 185873.61 requests per second, p50=0.135 msec                    
+GET: 185528.77 requests per second, p50=0.127 msec                    
+INCR: 183992.64 requests per second, p50=0.135 msec                    
+LPUSH: 205338.81 requests per second, p50=0.135 msec                    
+RPUSH: 208116.55 requests per second, p50=0.135 msec                    
+LPOP: 197238.64 requests per second, p50=0.135 msec                    
+RPOP: 197628.47 requests per second, p50=0.135 msec                    
+SADD: 201409.88 requests per second, p50=0.135 msec                    
+HSET: 201409.88 requests per second, p50=0.135 msec                    
+SPOP: 212765.95 requests per second, p50=0.127 msec                    
+MSET (10 keys): 181323.66 requests per second, p50=0.199 msec 
 ```
 
 ## Support Commands
