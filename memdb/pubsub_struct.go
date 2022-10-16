@@ -59,10 +59,11 @@ func (m *ChanMap) Send(key string, val string) int {
 	}
 }
 
-// Subscribe
+// Subscribe return a receiving chan and the ID of that chan based on the given key.
 func (m *ChanMap) Subscribe(key string) (<-chan *ChanMsg, string) {
 	channelTmp, ok := m.item.Get(key)
 	var channel *Chan
+	// channel does not exist => create one
 	if !ok {
 		channel = m.Create(key)
 	} else {
@@ -72,6 +73,7 @@ func (m *ChanMap) Subscribe(key string) (<-chan *ChanMsg, string) {
 	// lock a single channel shard since modifying attribute
 	channel.rw.Lock()
 	defer channel.rw.Unlock()
+	// register subscriber
 	channel.numSubs++
 	outID := uuid.NewString()
 	channel.out[outID] = out
@@ -79,10 +81,11 @@ func (m *ChanMap) Subscribe(key string) (<-chan *ChanMsg, string) {
 }
 
 func (m *ChanMap) UnSubscribe(key string, ID string) {
+	// get the channel
 	channelTmp, ok := m.item.Get(key)
 	var channel *Chan
 	if !ok {
-		logger.Error("Unsubscribing with a void channel key")
+		logger.Error("Unsubscribing with non-existing channel ")
 		return
 	} else {
 		channel = channelTmp.(*Chan)
@@ -93,6 +96,10 @@ func (m *ChanMap) UnSubscribe(key string, ID string) {
 	// delete out record
 	channel.numSubs--
 	delete(channel.out, ID)
+	// destroy channel with no subscribers to free memory
+	if channel.numSubs == 0 {
+		m.item.Delete(key)
+	}
 }
 
 // Create make a shard and add it to the map if the key does not exist and return that channel shard.

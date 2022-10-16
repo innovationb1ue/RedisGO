@@ -1,6 +1,7 @@
 package resp
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -112,6 +113,10 @@ func MakeErrorData(data ...string) *ErrorData {
 	return &ErrorData{
 		data: errMsg,
 	}
+}
+
+func MakeWrongNumberArgs(name string) *ErrorData {
+	return &ErrorData{data: fmt.Sprintf("ERR wrong number of arguments for '%s' command", name)}
 }
 
 func (r *ErrorData) ToBytes() []byte {
