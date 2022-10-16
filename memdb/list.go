@@ -782,6 +782,19 @@ func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
 	if len(cmd) < 3 {
 		return resp.MakeErrorData("ERR wrong number of arguments for 'blpop' command")
 	}
+	return bXPopList(m, cmd, "left")
+}
+
+func brPopList(m *MemDb, cmd [][]byte) resp.RedisData {
+	// at least 3 args like "BLPOP key timeout"
+	if len(cmd) < 3 {
+		return resp.MakeErrorData("ERR wrong number of arguments for 'blpop' command")
+	}
+	return bXPopList(m, cmd, "right")
+}
+
+func bXPopList(m *MemDb, cmd [][]byte, direction string) resp.RedisData {
+
 	// last arg is block timeout
 	timeout, err := strconv.Atoi(string(cmd[len(cmd)-1]))
 	if err != nil {
@@ -802,6 +815,8 @@ func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
 	for _, bStr := range keyBytes {
 		keyStrings = append(keyStrings, string(bStr))
 	}
+	left := "left"
+	right := "right"
 
 	// block (will return inside the infinite loop)
 	for {
@@ -819,7 +834,12 @@ func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
 					list, isList := tmp.(*List)
 					if isList {
 						// Pop from list
-						node := list.LPop()
+						var node *ListNode
+						if direction == left {
+							node = list.LPop()
+						} else if direction == right {
+							node = list.RPop()
+						}
 						if node != nil {
 							// find a value. need to manually release the lock since we are leaving this scope
 							m.locks.UnLock(key)
@@ -837,11 +857,6 @@ func blPopList(m *MemDb, cmd [][]byte) resp.RedisData {
 	}
 }
 
-// TODO: brpop from list
-//func brPopList(m *MemDb, cmd [][]byte) resp.RedisData {
-//    return nil
-//}
-
 func RegisterListCommands() {
 	RegisterCommand("llen", lLenList)
 	RegisterCommand("lindex", lIndexList)
@@ -858,5 +873,5 @@ func RegisterListCommands() {
 	RegisterCommand("lrange", lRangeList)
 	RegisterCommand("lmove", lMoveList)
 	RegisterCommand("blpop", blPopList)
-	//RegisterCommand("brpop", brPopList)
+	RegisterCommand("brpop", brPopList)
 }

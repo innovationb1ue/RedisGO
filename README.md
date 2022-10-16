@@ -133,4 +133,4 @@ All commands used as [redis commands](https://redis.io/commands/). You can use a
 |         | decrby      | lrange             | sunion      | hstrlen      |
 |         | incrbyfloat | lmove              | sunionstore | hrandfield   |
 |         | append      | blpop              |             |              |
-|         |             | brpop (working on) |             |
+|         |             | brpop              |             |
