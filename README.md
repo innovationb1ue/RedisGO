@@ -116,21 +116,23 @@ mset: 109289.62 requests per second
 ## Support Commands
 All commands used as [redis commands](https://redis.io/commands/). You can use any redis client to communicate with RedisGO.
 
-| key     | string      | list               | set         | hash         |
-|---------|-------------|--------------------|-------------|--------------|
-| del     | set         | llen               | sadd        | hdel         |
-| exists  | get         | lindex             | scard       | hexists      |
-| keys    | getrange    | lpos               | sdiff       | hget         |
-| expire  | setrange    | lpop               | sdirrstore  | hgetall      |
-| persist | mget        | rpop               | sinter      | hincrby      |
-| ttl     | mset        | lpush              | sinterstore | hincrbyfloat |
-| type    | setex       | lpushx             | sismember   | hkeys        |
-| rename  | setnx       | rpush              | smembers    | hlen         |
-|         | strlen      | rpushx             | smove       | hmget        |
-|         | incr        | lset               | spop        | hset         |
-|         | incrby      | lrem               | srandmember | hsetnx       |
-|         | decr        | ltrim              | srem        | hvals        |
-|         | decrby      | lrange             | sunion      | hstrlen      |
-|         | incrbyfloat | lmove              | sunionstore | hrandfield   |
-|         | append      | blpop              |             |              |
+| key     | string      | list               | set         | hash         | channels   | 
+|---------|-------------|--------------------|-------------|--------------|------------|
+| del     | set         | llen               | sadd        | hdel         | subscribe* |
+| exists  | get         | lindex             | scard       | hexists      | publish*   |
+| keys    | getrange    | lpos               | sdiff       | hget         |            |
+| expire  | setrange    | lpop               | sdirrstore  | hgetall      |            |
+| persist | mget        | rpop               | sinter      | hincrby      |            |
+| ttl     | mset        | lpush              | sinterstore | hincrbyfloat |            |
+| type    | setex       | lpushx             | sismember   | hkeys        |            |
+| rename  | setnx       | rpush              | smembers    | hlen         |            |
+|         | strlen      | rpushx             | smove       | hmget        |            |
+|         | incr        | lset               | spop        | hset         |            |
+|         | incrby      | lrem               | srandmember | hsetnx       |            |
+|         | decr        | ltrim              | srem        | hvals        |            |
+|         | decrby      | lrange             | sunion      | hstrlen      |            |
+|         | incrbyfloat | lmove              | sunionstore | hrandfield   |            |
+|         | append      | blpop              |             |              |            |
 |         |             | brpop              |             |
+
+*means partially implemented or is being worked on. 
