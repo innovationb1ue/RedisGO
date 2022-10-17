@@ -12,10 +12,13 @@ type Btree[T Val] struct {
 	dict   map[string]*Node[T]
 }
 
-// Val interface to define the compare method used to insert and find values
+// Val is the item in each Btree Node
 type Val interface {
-	Comp(val Val) int64
-	GetName() string
+	Comp(val float64) int64
+	GetNames() map[string]struct{}
+	AddName(name string)
+	DeleteName(name string)
+	IsNameExist(name string) bool
 }
 
 // Node represents a node in the tree with a value, left and right children, and a height/balance of the node.
@@ -60,32 +63,41 @@ func (t *Btree[T]) balance() int64 {
 }
 
 // Insert inserts a new value into the tree and returns the tree pointer
-func (t *Btree[T]) Insert(value T) *Btree[T] {
+func (t *Btree[T]) Insert(r *record) bool {
 	added := false
-	// todo: change to allow duplicate values
-	t.root = insert[T](t.root, value, &added, t)
+	t.root = insert[T](t.root, r, &added, t)
+	if _, ok := t.dict[r.name]; !ok {
+		added = true
+	}
 	if added {
 		t.len++
 	}
+	// empty values
 	t.values = nil
-	return t
+	return added
 }
 
-func insert[T Val](n *Node[T], value T, added *bool, tree *Btree[T]) *Node[T] {
+func insert[T Val](n *Node[T], r *record, added *bool, tree *Btree[T]) *Node[T] {
+	// if node does not exist, create a new node
 	if n == nil {
 		*added = true
-		n := (&Node[T]{Value: value}).Init()
-		tree.dict[value.GetName()] = n
+		n := (&Node[T]{Value: any(SortedSetNode{
+			Names: map[string]struct{}{r.name: {}},
+			Score: r.score,
+		}).(T)}).Init()
 		return n
 	}
-	c := value.Comp(n.Value)
-	if c > 0 {
-		n.right = insert(n.right, value, added, tree)
-	} else if c < 0 {
-		n.left = insert(n.left, value, added, tree)
+	// compare target with current node by score
+	c := n.Value.Comp(r.score)
+	if c < 0 {
+		n.right = insert(n.right, r, added, tree)
+	} else if c > 0 {
+		n.left = insert(n.left, r, added, tree)
 	} else {
-		n.Value = value
-		tree.dict[value.GetName()] = n
+		// if node exist, we add names to this node
+		for name, _ := range n.Value.GetNames() {
+			n.Value.AddName(name)
+		}
 		*added = false
 		return n
 	}
@@ -94,18 +106,18 @@ func insert[T Val](n *Node[T], value T, added *bool, tree *Btree[T]) *Node[T] {
 	c = balance(n)
 
 	if c > 1 {
-		c = value.Comp(n.left.Value)
-		if c < 0 {
+		c = n.Value.Comp(r.score)
+		if c > 0 {
 			return n.rotateRight()
-		} else if c > 0 {
+		} else if c < 0 {
 			n.left = n.left.rotateLeft()
 			return n.rotateRight()
 		}
 	} else if c < -1 {
-		c = value.Comp(n.right.Value)
-		if c > 0 {
+		c = n.Value.Comp(r.score)
+		if c < 0 {
 			return n.rotateLeft()
-		} else if c < 0 {
+		} else if c > 0 {
 			n.right = n.right.rotateRight()
 			return n.rotateLeft()
 		}
@@ -114,7 +126,7 @@ func insert[T Val](n *Node[T], value T, added *bool, tree *Btree[T]) *Node[T] {
 }
 
 // InsertAll inserts all the values into the tree and returns the tree pointer
-func (t *Btree[T]) InsertAll(values []T) *Btree[T] {
+func (t *Btree[T]) InsertAll(values []*record) *Btree[T] {
 	for _, v := range values {
 		t.Insert(v)
 	}
@@ -123,7 +135,7 @@ func (t *Btree[T]) InsertAll(values []T) *Btree[T] {
 
 // Contains returns true if the tree contains the specified value
 func (t *Btree[T]) Contains(value Val) bool {
-	return t.Get(value) != nil
+	return any(t.Get(value)) != nil
 }
 
 // ContainsAny returns true if the tree contains any of the values
@@ -147,7 +159,7 @@ func (t *Btree[T]) ContainsAll(values []Val) bool {
 }
 
 // Get returns the node value associated with the search value
-func (t *Btree[T]) Get(value Val) Val {
+func (t *Btree[T]) Get(value Val) T {
 	var node *Node[T]
 	if t.root != nil {
 		node = t.root.get(value)
@@ -226,20 +238,9 @@ func (t *Btree[T]) Values() []T {
 }
 
 // Delete deletes the node from the tree associated with the search value
-func (t *Btree[T]) Delete(value Val) *Btree[T] {
+func (t *Btree[T]) Delete(value string) *Btree[T] {
 	deleted := false
 	t.root = deleteNode(t.root, value, &deleted)
-	if deleted {
-		t.len--
-	}
-	t.values = nil
-	return t
-}
-
-// DeleteByName deletes the node from the tree associated with the search name
-func (t *Btree[T]) DeleteByName(value string) *Btree[T] {
-	deleted := false
-	t.root = deleteNodeByName(t.root, value, &deleted)
 	if deleted {
 		t.len--
 	}
@@ -255,32 +256,7 @@ func (t *Btree[T]) DeleteAll(values []Val) *Btree[T] {
 	return t
 }
 
-func deleteNodeByName[T Val](n *Node[T], value string, deleted *bool) *Node[T] {
-	if n == nil {
-		return n
-	}
-
-	if n.Value.GetName() == value {
-		// goes into this condition means we find the node we want to delete.
-		*deleted = true
-		// nothing smaller than this node
-		if n.left == nil {
-			t := n.right
-			n.Init() // remove pointers in this node
-			return t
-		}
-		// nothing larger than this node
-		if n.right == nil {
-			t := n.left
-			n.Init() // remove pointers in this node
-			return t
-		}
-		// intermediate node. we set the minimum child of right child to this node
-		t := n.right.min()
-		n.Value = t.Value
-		n.right = deleteNode(n.right, t.Value, deleted)
-	}
-
+func rebalance[T Val](n *Node[T]) *Node[T] {
 	//re-balance
 	if n == nil {
 		return n
@@ -300,21 +276,21 @@ func deleteNodeByName[T Val](n *Node[T], value string, deleted *bool) *Node[T] {
 		n.right = n.right.rotateRight()
 		return n.rotateLeft()
 	}
-
 	return n
 }
 
-func deleteNode[T Val](n *Node[T], value Val, deleted *bool) *Node[T] {
+func deleteNode[T Val](n *Node[T], target Val, deleted *bool) *Node[T] {
 	if n == nil {
 		return n
 	}
-	// compare the node value. todo: fix this to compare name
-	c := value.Comp(n.Value)
+	// compare the node target.
+	c := target.Comp()
 
+	// target value smaller than current node value
 	if c < 0 {
-		n.left = deleteNode(n.left, value, deleted)
+		n.left = deleteNode(n.left, target, deleted)
 	} else if c > 0 {
-		n.right = deleteNode(n.right, value, deleted)
+		n.right = deleteNode(n.right, target, deleted)
 	} else {
 		// goes into this condition means we find the node we want to delete.
 		*deleted = true
@@ -337,25 +313,7 @@ func deleteNode[T Val](n *Node[T], value Val, deleted *bool) *Node[T] {
 	}
 
 	//re-balance
-	if n == nil {
-		return n
-	}
-	n.height = n.maxHeight() + 1
-	bal := balance(n)
-	if bal > 1 {
-		if balance(n.left) >= 0 {
-			return n.rotateRight()
-		}
-		n.left = n.left.rotateLeft()
-		return n.rotateRight()
-	} else if bal < -1 {
-		if balance(n.right) <= 0 {
-			return n.rotateLeft()
-		}
-		n.right = n.right.rotateRight()
-		return n.rotateLeft()
-	}
-
+	n = rebalance(n)
 	return n
 }
 
@@ -460,16 +418,18 @@ func balance[T Val](n *Node[T]) int64 {
 	return height(n.left) - height(n.right)
 }
 
-func (n *Node[T]) get(val Val) *Node[T] {
+// get return the node based on the value
+func (n *Node[T]) get(target Val) *Node[T] {
 	var node *Node[T]
-	c := val.Comp(n.Value)
+	c := target.Comp(n.Value)
+	// target value < current value
 	if c < 0 {
 		if n.left != nil {
-			node = n.left.get(val)
+			node = n.left.get(target)
 		}
 	} else if c > 0 {
 		if n.right != nil {
-			node = n.right.get(val)
+			node = n.right.get(target)
 		}
 	} else {
 		node = n

@@ -810,7 +810,7 @@ func bXPopList(m *MemDb, cmd [][]byte, direction string) resp.RedisData {
 	// query interval (this could be narrowed down to query more frequently but will use more CPU resource)
 	ticker := time.NewTicker(100 * time.Millisecond) // 100ms per query = 10 times per second
 
-	// retrieve all list names
+	// retrieve all list Names
 	keyBytes := cmd[1 : len(cmd)-1]
 	keyStrings := make([]string, 0, len(keyBytes))
 	for _, bStr := range keyBytes {

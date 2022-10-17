@@ -125,7 +125,7 @@ func (l *List) LPush(val []byte) {
 	l.Len++
 	// check subscriptions
 	if len(l.LSubscriptions) > 0 {
-		// LPOP and return the name to chan
+		// LPOP and return the Names to chan
 		for _, out := range l.LSubscriptions {
 			val := l.LPop().Val
 			out <- val
@@ -141,7 +141,7 @@ func (l *List) RPush(val []byte) {
 	l.Len++
 	// check subscriptions
 	if len(l.LSubscriptions) > 0 {
-		// RPOP and return the name to chan
+		// RPOP and return the Names to chan
 		for _, out := range l.LSubscriptions {
 			val := l.LPop().Val
 			out <- val
@@ -269,7 +269,7 @@ func (l *List) InsertAfter(val []byte, tar []byte) int {
 	return -1
 }
 
-// RemoveElement remove count number elements with Val=name from list, if count is 0, remove all elements.
+// RemoveElement remove count number elements with Val=Names from list, if count is 0, remove all elements.
 // return the number of elements removed.
 // if count>0, remove from head to tail, otherwise remove from tail to head
 func (l *List) RemoveElement(val []byte, count int) int {

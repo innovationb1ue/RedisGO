@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"github.com/innovationb1ue/RedisGO/resp"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -22,7 +23,7 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 	for _, s := range elems[2:] {
 		optionsStr += s + "/"
 	}
-	// idx points to the start index of score:member pairs
+	// idx points to the start index of Score:member pairs
 	idx := 2
 	// get options
 	optionDict := map[string]bool{"nx": false, "xx": false, "gt": false, "lt": false, "ch": false, "incr": false}
@@ -38,14 +39,15 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 	}
 	// get key, create a sorted list if key does not exist
 	m.locks.Lock(key)
+	// lock the key
 	defer m.locks.UnLock(key)
-	var sortedSet *SortedSet[SortedSetNode]
+	var sortedSet *SortedSet[*SortedSetNode]
 	SortedsetTmp, ok := m.db.Get(key)
 	if !ok {
 		sortedSet = NewSortedSet()
 		m.db.Set(key, sortedSet)
 	} else {
-		sortedSet, ok = SortedsetTmp.(*SortedSet[SortedSetNode])
+		sortedSet, ok = SortedsetTmp.(*SortedSet[*SortedSetNode])
 		if !ok {
 			return resp.MakeWrongType()
 		}
@@ -57,29 +59,26 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 		if i+1 >= len(cmd) {
 			return resp.MakeErrorData("ERR syntax error")
 		}
-		// phrase score
+		// phrase Score
 		score, err := strconv.ParseFloat(string(cmd[i]), 64)
 		if err != nil {
 			return resp.MakeErrorData("ERR value is not a valid float")
 		}
-		// get member name
+		// get member Names
 		member := string(cmd[i+1])
-		// insert value (copy here. ) todo: change this to pass by reference to avoid coping everywhere.
-		item := SortedSetNode{
+		// insert value (copied here. )
+		r := &record{
 			name:  member,
 			score: score,
 		}
-		isExist := sortedSet.GetByName(member)
-		// if the node exists, delete it first. O(logn)
-		if isExist != nil {
-			sortedSet.DeleteByName(member)
-			sortedSet.Insert(item)
-		} else {
-			sortedSet.Insert(item)
+		// if the node exists, append the member Names to the node.Names list
+		added := sortedSet.Insert(r)
+		if added {
 			addedCount++
 		}
-	}
 
+	}
+	log.Println(sortedSet.Values(), sortedSet.len)
 	return resp.MakeIntData(addedCount)
 }
 

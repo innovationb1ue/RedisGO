@@ -6,23 +6,39 @@ type SortedSet[T Val] struct {
 	*Btree[T]
 }
 
-func NewSortedSet() *SortedSet[SortedSetNode] {
-	return &SortedSet[SortedSetNode]{NewBtree[SortedSetNode]()}
+func NewSortedSet() *SortedSet[*SortedSetNode] {
+	return &SortedSet[*SortedSetNode]{NewBtree[*SortedSetNode]()}
 }
 
-type SortedSetNode struct {
+type record struct {
 	name  string
 	score float64
 }
 
-func (n SortedSetNode) Comp(val Val) int64 {
-	// only compare the same type of values
-	n2 := val.(SortedSetNode)
-	if n.score > n2.score {
+type SortedSetNode struct {
+	Names map[string]struct{} // allow multiple member with the same value
+	Score float64
+}
+
+func (n *SortedSetNode) IsNameExist(name string) bool {
+	_, ok := n.Names[name]
+	return ok
+}
+
+func (n *SortedSetNode) AddName(name string) {
+	n.Names[name] = struct{}{}
+}
+
+func (n *SortedSetNode) DeleteName(name string) {
+	delete(n.Names, name)
+}
+
+func (n *SortedSetNode) Comp(val float64) int64 {
+	if n.Score > val {
 		return 1
-	} else if n.score < n2.score {
+	} else if n.Score < val {
 		return -1
-	} else if n.score == n2.score {
+	} else if n.Score == val {
 		return 0
 	} else {
 		logger.Error("cant compare values in sorted set Comp")
@@ -30,6 +46,6 @@ func (n SortedSetNode) Comp(val Val) int64 {
 	}
 }
 
-func (n SortedSetNode) GetName() string {
-	return n.name
+func (n *SortedSetNode) GetNames() map[string]struct{} {
+	return n.Names
 }
