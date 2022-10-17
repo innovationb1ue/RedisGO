@@ -115,6 +115,10 @@ func MakeErrorData(data ...string) *ErrorData {
 	}
 }
 
+func MakeWrongType() *ErrorData {
+	return &ErrorData{data: fmt.Sprintf("WRONGTYPE Operation against a key holding the wrong kind of value")}
+}
+
 func MakeWrongNumberArgs(name string) *ErrorData {
 	return &ErrorData{data: fmt.Sprintf("ERR wrong number of arguments for '%s' command", name)}
 }

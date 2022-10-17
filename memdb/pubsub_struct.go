@@ -125,7 +125,7 @@ func (c *Chan) Broadcast() {
 	// do broadcast
 	for elem := range c.in {
 		for _, outChan := range c.out {
-			// "message", channel name, val
+			// "message", channel name, name
 			outChan <- elem
 		}
 		break

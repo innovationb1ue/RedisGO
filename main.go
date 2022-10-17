@@ -18,6 +18,7 @@ func init() {
 	memdb.RegisterSetCommands()
 	memdb.RegisterHashCommands()
 	memdb.RegisterPubSubCommands()
+	memdb.RegisterSortedSetCommands()
 }
 
 func main() {

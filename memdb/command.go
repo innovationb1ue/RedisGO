@@ -5,6 +5,8 @@ import (
 	"net"
 )
 
+type cmdBytes = [][]byte
+
 // CmdTable holds all registered commands
 var CmdTable = make(map[string]*command)
 
