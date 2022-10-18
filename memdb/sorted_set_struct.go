@@ -10,14 +10,28 @@ func NewSortedSet() *SortedSet[*SortedSetNode] {
 	return &SortedSet[*SortedSetNode]{NewBtree[*SortedSetNode]()}
 }
 
-type record struct {
-	name  string
-	score float64
-}
-
 type SortedSetNode struct {
 	Names map[string]struct{} // allow multiple member with the same value
 	Score float64
+}
+
+func (n *SortedSetNode) Empty() {
+	n.Names = nil
+}
+
+func (n *SortedSetNode) SetScore(score float64) {
+	n.Score = score
+}
+
+func (n *SortedSetNode) GetScore() float64 {
+	return n.Score
+}
+
+func (n *SortedSetNode) GetFirstName() string {
+	for k := range n.Names {
+		return k
+	}
+	return ""
 }
 
 func (n *SortedSetNode) IsNameExist(name string) bool {
@@ -33,12 +47,13 @@ func (n *SortedSetNode) DeleteName(name string) {
 	delete(n.Names, name)
 }
 
-func (n *SortedSetNode) Comp(val float64) int64 {
-	if n.Score > val {
+func (n *SortedSetNode) Comp(val Val) int64 {
+	n2 := val.(*SortedSetNode)
+	if n.Score > n2.Score {
 		return 1
-	} else if n.Score < val {
+	} else if n.Score < n2.Score {
 		return -1
-	} else if n.Score == val {
+	} else if n.Score == n2.Score {
 		return 0
 	} else {
 		logger.Error("cant compare values in sorted set Comp")

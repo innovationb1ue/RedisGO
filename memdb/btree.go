@@ -1,23 +1,28 @@
 package memdb
 
 import (
+	"errors"
 	"fmt"
 )
 
 // Btree represents an AVL tree
 type Btree[T Val] struct {
 	root   *Node[T]
-	values []T
+	values []map[string]float64
 	len    int
 	dict   map[string]*Node[T]
 }
 
 // Val is the item in each Btree Node
 type Val interface {
-	Comp(val float64) int64
-	GetNames() map[string]struct{}
+	Comp(val Val) int64 // compare value with another Val
+	SetScore(score float64)
+	GetScore() float64
+	GetNames() map[string]struct{} // allowed multiple names in a single node
+	GetFirstName() string
 	AddName(name string)
 	DeleteName(name string)
+	Empty()
 	IsNameExist(name string) bool
 }
 
@@ -29,7 +34,9 @@ type Node[T Val] struct {
 }
 
 // NewBtree returns a new btree
-func NewBtree[T Val]() *Btree[T] { return new(Btree[T]).Init() }
+func NewBtree[T Val]() *Btree[T] {
+	return new(Btree[T]).Init()
+}
 
 // Init initializes all values/clears the tree and returns the tree pointer
 func (t *Btree[T]) Init() *Btree[T] {
@@ -63,41 +70,42 @@ func (t *Btree[T]) balance() int64 {
 }
 
 // Insert inserts a new value into the tree and returns the tree pointer
-func (t *Btree[T]) Insert(r *record) bool {
-	added := false
-	t.root = insert[T](t.root, r, &added, t)
-	if _, ok := t.dict[r.name]; !ok {
-		added = true
-	}
-	if added {
+func (t *Btree[T]) Insert(r T) (bool, bool) {
+	nodeAdded := false
+	memberAdded := t.dict[r.GetFirstName()] == nil
+	// do insertion, might change the structure of tree
+	t.root = insert[T](t.root, r, &nodeAdded, t)
+	if nodeAdded {
 		t.len++
 	}
 	// empty values
 	t.values = nil
-	return added
+	return nodeAdded, memberAdded
 }
 
-func insert[T Val](n *Node[T], r *record, added *bool, tree *Btree[T]) *Node[T] {
-	// if node does not exist, create a new node
+func insert[T Val](n *Node[T], target T, added *bool, tree *Btree[T]) *Node[T] {
+	// if this node does not exist, create a new node
 	if n == nil {
 		*added = true
-		n := (&Node[T]{Value: any(SortedSetNode{
-			Names: map[string]struct{}{r.name: {}},
-			Score: r.score,
-		}).(T)}).Init()
+		n := (&Node[T]{Value: target}).Init()
+		for k := range n.Value.GetNames() {
+			tree.dict[k] = n
+		}
 		return n
 	}
-	// compare target with current node by score
-	c := n.Value.Comp(r.score)
+	// compare current with target node by score
+	c := n.Value.Comp(target)
 	if c < 0 {
-		n.right = insert(n.right, r, added, tree)
+		n.right = insert(n.right, target, added, tree)
 	} else if c > 0 {
-		n.left = insert(n.left, r, added, tree)
+		n.left = insert(n.left, target, added, tree)
 	} else {
 		// if node exist, we add names to this node
-		for name, _ := range n.Value.GetNames() {
+		for name := range target.GetNames() {
 			n.Value.AddName(name)
+			tree.dict[name] = n
 		}
+		// didn't create new node
 		*added = false
 		return n
 	}
@@ -106,7 +114,7 @@ func insert[T Val](n *Node[T], r *record, added *bool, tree *Btree[T]) *Node[T] 
 	c = balance(n)
 
 	if c > 1 {
-		c = n.Value.Comp(r.score)
+		c = n.Value.Comp(target)
 		if c > 0 {
 			return n.rotateRight()
 		} else if c < 0 {
@@ -114,7 +122,7 @@ func insert[T Val](n *Node[T], r *record, added *bool, tree *Btree[T]) *Node[T] 
 			return n.rotateRight()
 		}
 	} else if c < -1 {
-		c = n.Value.Comp(r.score)
+		c = n.Value.Comp(target)
 		if c < 0 {
 			return n.rotateLeft()
 		} else if c > 0 {
@@ -126,7 +134,7 @@ func insert[T Val](n *Node[T], r *record, added *bool, tree *Btree[T]) *Node[T] 
 }
 
 // InsertAll inserts all the values into the tree and returns the tree pointer
-func (t *Btree[T]) InsertAll(values []*record) *Btree[T] {
+func (t *Btree[T]) InsertAll(values []T) *Btree[T] {
 	for _, v := range values {
 		t.Insert(v)
 	}
@@ -134,12 +142,13 @@ func (t *Btree[T]) InsertAll(values []*record) *Btree[T] {
 }
 
 // Contains returns true if the tree contains the specified value
-func (t *Btree[T]) Contains(value Val) bool {
-	return any(t.Get(value)) != nil
+func (t *Btree[T]) Contains(value T) bool {
+	_, ok := t.Get(value)
+	return ok
 }
 
 // ContainsAny returns true if the tree contains any of the values
-func (t *Btree[T]) ContainsAny(values []Val) bool {
+func (t *Btree[T]) ContainsAny(values []T) bool {
 	for _, v := range values {
 		if t.Contains(v) {
 			return true
@@ -148,8 +157,8 @@ func (t *Btree[T]) ContainsAny(values []Val) bool {
 	return false
 }
 
-// ContainsAll returns true if the tree contains all of the values
-func (t *Btree[T]) ContainsAll(values []Val) bool {
+// ContainsAll returns true if the tree contains all the values
+func (t *Btree[T]) ContainsAll(values []T) bool {
 	for _, v := range values {
 		if !t.Contains(v) {
 			return false
@@ -159,15 +168,15 @@ func (t *Btree[T]) ContainsAll(values []Val) bool {
 }
 
 // Get returns the node value associated with the search value
-func (t *Btree[T]) Get(value Val) T {
+func (t *Btree[T]) Get(value T) (T, bool) {
 	var node *Node[T]
 	if t.root != nil {
 		node = t.root.get(value)
 	}
 	if node != nil {
-		return node.Value
+		return node.Value, true
 	}
-	return nil
+	return *new(T), false
 }
 
 func (t *Btree[T]) GetByName(name string) *Node[T] {
@@ -206,9 +215,9 @@ func (t *Btree[T]) Head() Val {
 }
 
 // Tail returns the last value in the tree
-func (t *Btree[T]) Tail() Val {
+func (t *Btree[T]) Tail() (T, error) {
 	if t.root == nil {
-		return nil
+		return *new(T), errors.New("")
 	}
 	var beginning = t.root
 	for beginning.right != nil {
@@ -220,17 +229,19 @@ func (t *Btree[T]) Tail() Val {
 		}
 	}
 	if beginning != nil {
-		return beginning.Value
+		return beginning.Value, nil
 	}
-	return nil
+	return *new(T), errors.New("")
 }
 
 // Values returns a slice of all the values in tree in order
-func (t *Btree[T]) Values() []T {
+func (t *Btree[T]) Values() []map[string]float64 {
 	if t.values == nil {
-		t.values = make([]T, t.len)
+		t.values = make([]map[string]float64, 0)
 		t.Ascend(func(n *Node[T], i int) bool {
-			t.values[i] = n.Value
+			for name := range n.Value.GetNames() {
+				t.values = append(t.values, map[string]float64{name: n.Value.GetScore()})
+			}
 			return true
 		})
 	}
@@ -238,9 +249,17 @@ func (t *Btree[T]) Values() []T {
 }
 
 // Delete deletes the node from the tree associated with the search value
-func (t *Btree[T]) Delete(value string) *Btree[T] {
+func (t *Btree[T]) Delete(name string) *Btree[T] {
 	deleted := false
-	t.root = deleteNode(t.root, value, &deleted)
+	// get node by name
+	node, ok := t.dict[name]
+	// deleting a non-exist member
+	if !ok {
+		return nil
+	}
+	// delete it
+	t.root = deleteNode(t.root, node.Value, &deleted)
+	delete(t.dict, name)
 	if deleted {
 		t.len--
 	}
@@ -249,7 +268,7 @@ func (t *Btree[T]) Delete(value string) *Btree[T] {
 }
 
 // DeleteAll deletes the nodes from the tree associated with the search values
-func (t *Btree[T]) DeleteAll(values []Val) *Btree[T] {
+func (t *Btree[T]) DeleteAll(values []string) *Btree[T] {
 	for _, v := range values {
 		t.Delete(v)
 	}
@@ -279,12 +298,12 @@ func rebalance[T Val](n *Node[T]) *Node[T] {
 	return n
 }
 
-func deleteNode[T Val](n *Node[T], target Val, deleted *bool) *Node[T] {
+func deleteNode[T Val](n *Node[T], target T, deleted *bool) *Node[T] {
 	if n == nil {
 		return n
 	}
-	// compare the node target.
-	c := target.Comp()
+	// compare the node target by score
+	c := target.Comp(n.Value)
 
 	// target value smaller than current node value
 	if c < 0 {
@@ -293,44 +312,64 @@ func deleteNode[T Val](n *Node[T], target Val, deleted *bool) *Node[T] {
 		n.right = deleteNode(n.right, target, deleted)
 	} else {
 		// goes into this condition means we find the node we want to delete.
-		*deleted = true
-		// nothing smaller than this node
-		if n.left == nil {
-			t := n.right
-			n.Init() // remove pointers in this node
-			return t
+		// if no member in this node anymore or we want to remove all members.
+		if len(n.Value.GetNames()) == 0 || len(target.GetNames()) == len(n.Value.GetNames()) {
+			*deleted = true
+			// nothing smaller than this node
+			if n.left == nil {
+				t := n.right
+				n.Init() // remove pointers in this node
+				return t
+			}
+			// nothing larger than this node
+			if n.right == nil {
+				t := n.left
+				n.Init() // remove pointers in this node
+				return t
+			}
+			// till here we have an intermediate node. we set the minimum child of right child to this node
+			t := n.right.min()
+			// note here. Value is a pointer. We point this node Value to the child Value
+			// but the pointers point to that child will be deleted so that child become unreachable and can be freed
+			n.Value = t.Value
+			// delete that child
+			n.right = deleteNode(n.right, t.Value, deleted)
+			return n
+		} else {
+			// remove a subset of names
+			for name := range target.GetNames() {
+				n.Value.DeleteName(name)
+			}
+			// still has members in this node, we just return it. no tree rotation needed since no change of structure
+			return n
 		}
-		// nothing larger than this node
-		if n.right == nil {
-			t := n.left
-			n.Init() // remove pointers in this node
-			return t
-		}
-		// intermediate node. we set the minimum child of right child to this node
-		t := n.right.min()
-		n.Value = t.Value
-		n.right = deleteNode(n.right, t.Value, deleted)
 	}
-
 	//re-balance
 	n = rebalance(n)
 	return n
 }
 
 // Pop deletes the last node from the tree and returns its value
-func (t *Btree[T]) Pop() Val {
-	value := t.Tail()
-	if value != nil {
-		t.Delete(value)
+func (t *Btree[T]) Pop() (T, error) {
+	value, err := t.Tail()
+	if err != nil {
+		return value, err
 	}
-	return value
+	for name := range value.GetNames() {
+		t.Delete(name)
+		break
+	}
+	return value, nil
 }
 
 // Pull deletes the first node from the tree and returns its value
 func (t *Btree[T]) Pull() Val {
 	value := t.Head()
 	if value != nil {
-		t.Delete(value)
+		for name := range value.GetNames() {
+			t.Delete(name)
+			break
+		}
 	}
 	return value
 }
@@ -348,7 +387,8 @@ func (t *Btree[T]) Ascend(iterator NodeIterator[T]) {
 }
 
 // Descend performs a descending order traversal of the tree using the iterator
-// the iterator will continue as long as the NodeIterator returns true
+//
+//	will continue as long as the NodeIterator returns true
 func (t *Btree[T]) Descend(iterator NodeIterator[T]) {
 	var i int
 	if t.root != nil {
@@ -419,7 +459,7 @@ func balance[T Val](n *Node[T]) int64 {
 }
 
 // get return the node based on the value
-func (n *Node[T]) get(target Val) *Node[T] {
+func (n *Node[T]) get(target T) *Node[T] {
 	var node *Node[T]
 	c := target.Comp(n.Value)
 	// target value < current value

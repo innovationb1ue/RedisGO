@@ -37,11 +37,11 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 	if (optionDict["gt"] && optionDict["lt"]) || (optionDict["nx"] && optionDict["gt"]) || (optionDict["nx"] && optionDict["lt"]) {
 		return resp.MakeErrorData("ERR GT, LT, and/or NX options at the same time are not compatible")
 	}
-	// get key, create a sorted list if key does not exist
-	m.locks.Lock(key)
 	// lock the key
+	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
 	var sortedSet *SortedSet[*SortedSetNode]
+	// get key, create a sorted list if key does not exist
 	SortedsetTmp, ok := m.db.Get(key)
 	if !ok {
 		sortedSet = NewSortedSet()
@@ -66,17 +66,20 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 		}
 		// get member Names
 		member := string(cmd[i+1])
-		// insert value (copied here. )
-		r := &record{
-			name:  member,
-			score: score,
+		// insert value (temporal structure here)
+		r := &SortedSetNode{
+			Names: map[string]struct{}{member: {}},
+			Score: score,
 		}
 		// if the node exists, append the member Names to the node.Names list
-		added := sortedSet.Insert(r)
+		node := sortedSet.GetByName(member)
+		if node != nil {
+			sortedSet.Delete(member)
+		}
+		_, added := sortedSet.Insert(r)
 		if added {
 			addedCount++
 		}
-
 	}
 	log.Println(sortedSet.Values(), sortedSet.len)
 	return resp.MakeIntData(addedCount)
