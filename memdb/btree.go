@@ -70,9 +70,8 @@ func (t *Btree[T]) balance() int64 {
 }
 
 // Insert inserts a new value into the tree and returns the tree pointer
-func (t *Btree[T]) Insert(r T) (bool, bool) {
+func (t *Btree[T]) Insert(r T) bool {
 	nodeAdded := false
-	memberAdded := t.dict[r.GetFirstName()] == nil
 	// do insertion, might change the structure of tree
 	t.root = insert[T](t.root, r, &nodeAdded, t)
 	if nodeAdded {
@@ -80,18 +79,16 @@ func (t *Btree[T]) Insert(r T) (bool, bool) {
 	}
 	// empty values
 	t.values = nil
-	return nodeAdded, memberAdded
+	return nodeAdded
 }
 
 func insert[T Val](n *Node[T], target T, added *bool, tree *Btree[T]) *Node[T] {
 	// if this node does not exist, create a new node
 	if n == nil {
 		*added = true
-		n := (&Node[T]{Value: target}).Init()
-		for k := range n.Value.GetNames() {
-			tree.dict[k] = n
-		}
-		return n
+		node := (&Node[T]{Value: target}).Init()
+		tree.dict[target.GetFirstName()] = node
+		return node
 	}
 	// compare current with target node by score
 	c := n.Value.Comp(target)

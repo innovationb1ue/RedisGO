@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
+func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 	if len(cmd) < 4 {
 		return resp.MakeWrongNumberArgs("zadd")
 	}
@@ -27,7 +27,7 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 	idx := 2
 	// get options
 	optionDict := map[string]bool{"nx": false, "xx": false, "gt": false, "lt": false, "ch": false, "incr": false}
-	for k, _ := range optionDict {
+	for k := range optionDict {
 		if strings.Contains(optionsStr, k) {
 			optionDict[k] = true
 			idx++
@@ -54,6 +54,7 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 	}
 	var addedCount int64
 	// set value:member pairs
+	// todo: optimize performance here. dont create a single virtual node in each loop
 	for i := idx; i < len(cmd); i += 2 {
 		// check overflow
 		if i+1 >= len(cmd) {
@@ -71,17 +72,19 @@ func zadd(m *MemDb, cmd cmdBytes, conn net.Conn) resp.RedisData {
 			Names: map[string]struct{}{member: {}},
 			Score: score,
 		}
-		// if the node exists, append the member Names to the node.Names list
+		// decide member count
+		if _, ok := sortedSet.dict[member]; !ok {
+			addedCount++
+		}
+		// if the member exists, delete it first
 		node := sortedSet.GetByName(member)
 		if node != nil {
 			sortedSet.Delete(member)
 		}
-		_, added := sortedSet.Insert(r)
-		if added {
-			addedCount++
-		}
+		// insert member
+		sortedSet.Insert(r)
 	}
-	log.Println(sortedSet.Values(), sortedSet.len)
+	log.Println(sortedSet.Values())
 	return resp.MakeIntData(addedCount)
 }
 
