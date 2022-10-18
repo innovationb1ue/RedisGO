@@ -130,7 +130,7 @@ All commands used as [redis commands](https://redis.io/commands/). You can use a
 
 | key     | string      | list   | set         | hash         | channels   | sorted set |  
 |---------|-------------|--------|-------------|--------------|------------|------------|
-| del     | set         | llen   | sadd        | hdel         | subscribe* | sadd       |
+| del     | set         | llen   | sadd        | hdel         | subscribe* | zadd       |
 | exists  | get         | lindex | scard       | hexists      | publish*   |            |
 | keys    | getrange    | lpos   | sdiff       | hget         |            |            |
 | expire  | setrange    | lpop   | sdirrstore  | hgetall      |            |            |
