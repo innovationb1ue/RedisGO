@@ -19,7 +19,6 @@ type Val interface {
 	SetScore(score float64)
 	GetScore() float64
 	GetNames() map[string]struct{} // allowed multiple names in a single node
-	GetFirstName() string
 	AddName(name string)
 	DeleteName(name string)
 	Empty()
@@ -87,7 +86,9 @@ func insert[T Val](n *Node[T], target T, added *bool, tree *Btree[T]) *Node[T] {
 	if n == nil {
 		*added = true
 		node := (&Node[T]{Value: target}).Init()
-		tree.dict[target.GetFirstName()] = node
+		for name := range target.GetNames() {
+			tree.dict[name] = node
+		}
 		return node
 	}
 	// compare current with target node by score

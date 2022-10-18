@@ -3,42 +3,54 @@ package memdb
 import (
 	"fmt"
 	"github.com/innovationb1ue/RedisGO/resp"
-	"log"
 	"net"
 	"strconv"
-	"strings"
 )
 
 func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 	if len(cmd) < 4 {
 		return resp.MakeWrongNumberArgs("zadd")
 	}
-	key := string(cmd[1])
+	// convert bytes to strings
 	elems := make([]string, 0, len(cmd))
 	for _, b := range cmd {
 		elems = append(elems, string(b))
 	}
-	// phrase options
-	optionsStr := ""
-	// skip "ZADD" and "{KEY}"
-	for _, s := range elems[2:] {
-		optionsStr += s + "/"
-	}
+	key := elems[1]
 	// idx points to the start index of Score:member pairs
 	idx := 2
 	// get options
-	optionDict := map[string]bool{"nx": false, "xx": false, "gt": false, "lt": false, "ch": false, "incr": false}
-	for k := range optionDict {
-		if strings.Contains(optionsStr, k) {
-			optionDict[k] = true
+	var nx, xx, gt, lt, ch, incr bool
+	var endArgsFlag bool
+	for i := idx; i < len(cmd)-2; i++ {
+		switch elems[i] {
+		case "nx":
+			nx = true
+		case "xx":
+			xx = true
+		case "gt":
+			gt = true
+		case "lt":
+			lt = true
+		case "ch":
+			ch = true
+		case "incr":
+			incr = true
+		default:
+			endArgsFlag = true
+			break
+		}
+		if endArgsFlag {
+			break
+		} else {
 			idx++
 		}
 	}
 	// check mutual excluded options
-	if (optionDict["gt"] && optionDict["lt"]) || (optionDict["nx"] && optionDict["gt"]) || (optionDict["nx"] && optionDict["lt"]) {
+	if (gt && lt) || (nx && gt) || (nx && lt) {
 		return resp.MakeErrorData("ERR GT, LT, and/or NX options at the same time are not compatible")
 	}
-	if optionDict["incr"] && len(cmd) != 5 {
+	if incr && len(cmd) != 5 {
 		return resp.MakeErrorData("ERR INCR option supports a single increment-element pair")
 	}
 
@@ -58,7 +70,7 @@ func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 			return resp.MakeWrongType()
 		}
 	}
-	var retInt int64
+	retInt := int64(0)
 	var targetScore float64 // used when incr option
 	// set value:member pairs
 	// todo: optimize performance here. dont create a single virtual node in each loop
@@ -74,11 +86,32 @@ func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 		}
 		// get member Names
 		member := string(cmd[i+1])
-		// try to get the old member if exist
+		// try to get the old member if exist (node can be nil)
 		node := sortedSet.GetByName(member)
+		// check update-only option
+		if node == nil && xx {
+			continue
+		}
+		// check add-only option
+		if node != nil && nx {
+			continue
+		}
+		// check less-than option
+		if node != nil && lt && score >= node.Value.GetScore() {
+			continue
+		}
+		// check greater-than option
+		if node != nil && gt && score <= node.Value.GetScore() {
+			continue
+		}
+		// check for all same conditions. => do nothing
+		if node != nil && !incr && score == node.Value.GetScore() {
+			continue
+		}
+
+		// check incr option
 		var r *SortedSetNode
-		// check incr option or normally set the score
-		if optionDict["incr"] && node != nil {
+		if incr && node != nil {
 			targetScore = node.Value.GetScore() + score
 			// create a virtual node to hold member names
 			r = &SortedSetNode{
@@ -94,7 +127,7 @@ func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 		// decide the return int64 value
 		// ch means return the number of value changed	(added + changed)
 		// normally we only count the member added 		(added)
-		if optionDict["ch"] && node.Value.GetScore() != score {
+		if ch && node.Value.GetScore() != score {
 			retInt++
 		} else
 		// member non-exist
@@ -108,13 +141,19 @@ func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 		// insert new member
 		sortedSet.Insert(r)
 	}
-	log.Println(sortedSet.Values())
-	if optionDict["incr"] {
+	//log.Println(sortedSet.Values())
+	if incr {
 		return resp.MakeBulkData(resp.MakePlainData(fmt.Sprintf("%f", targetScore)).ByteData())
 	}
 	return resp.MakeIntData(retInt)
 }
 
+func zrange(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
+
+	return nil
+}
+
 func RegisterSortedSetCommands() {
 	RegisterCommand("zadd", zadd)
+	RegisterCommand("zrange", zrange)
 }

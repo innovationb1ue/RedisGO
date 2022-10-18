@@ -27,13 +27,6 @@ func (n *SortedSetNode) GetScore() float64 {
 	return n.Score
 }
 
-func (n *SortedSetNode) GetFirstName() string {
-	for k := range n.Names {
-		return k
-	}
-	return ""
-}
-
 func (n *SortedSetNode) IsNameExist(name string) bool {
 	_, ok := n.Names[name]
 	return ok
