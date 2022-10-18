@@ -1,6 +1,7 @@
 package memdb
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 )
 
 // string.go file implements the string commands of redis
-func setString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func setString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	cmdKey := strings.ToLower(string(cmd[1]))
 	if len(cmd) < 3 {
 		return resp.MakeErrorData("error: commands is invalid")
@@ -138,7 +139,7 @@ func setString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return res
 }
 
-func getString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func getString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "get" {
 		logger.Error("getString func: cmdName != get")
 		return resp.MakeErrorData("Server error")
@@ -166,7 +167,7 @@ func getString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeBulkData(byteVal)
 }
 
-func getRangeString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func getRangeString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "getrange" {
 		logger.Error("getRangeString func: cmdName != getrange")
 		return resp.MakeErrorData("Server error")
@@ -219,7 +220,7 @@ func getRangeString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeBulkData(byteVal[start:end])
 }
 
-func setRangeString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func setRangeString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "setrange" {
 		logger.Error("setRangeString func: cmdName != setrange")
 		return resp.MakeErrorData("Server error")
@@ -265,7 +266,7 @@ func setRangeString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(int64(len(newVal)))
 }
 
-func mGetString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func mGetString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "mget" {
 		logger.Error("mGetString func: cmdName != mget")
 		return resp.MakeErrorData("Server error")
@@ -297,7 +298,7 @@ func mGetString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeArrayData(res)
 }
 
-func mSetString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func mSetString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "mset" {
 		logger.Error("mSetString func: cmdName != mset")
 		return resp.MakeErrorData("Server error")
@@ -323,7 +324,7 @@ func mSetString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func setExString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func setExString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "setex" {
 		logger.Error("setExString func: cmdName != setex")
 		return resp.MakeErrorData("Server error")
@@ -348,7 +349,7 @@ func setExString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func setNxString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func setNxString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "setnx" {
 		logger.Error("setNxString func: cmdName != setnx")
 		return resp.MakeErrorData("Server error")
@@ -368,7 +369,7 @@ func setNxString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(int64(res))
 }
 
-func strLenString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func strLenString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "strlen" {
 		logger.Error("strLenString func: cmdName != strlen")
 		return resp.MakeErrorData("Server error")
@@ -393,7 +394,7 @@ func strLenString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(int64(len(typeVal)))
 }
 
-func incrString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func incrString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "incr" {
 		logger.Error("incrString func: cmdName != incr")
 		return resp.MakeErrorData("Server error")
@@ -424,7 +425,7 @@ func incrString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(intVal)
 }
 
-func incrByString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func incrByString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "incrby" {
 		logger.Error("incrByString func: cmdName != incrby")
 		return resp.MakeErrorData("Server error")
@@ -459,7 +460,7 @@ func incrByString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(intVal)
 }
 
-func decrString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func decrString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "decr" {
 		logger.Error("decrString func: cmdName != decr")
 		return resp.MakeErrorData("Server error")
@@ -490,7 +491,7 @@ func decrString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(intVal)
 }
 
-func decrByString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func decrByString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "decrby" {
 		logger.Error("decrByString func: cmdName != decrby")
 		return resp.MakeErrorData("Server error")
@@ -525,7 +526,7 @@ func decrByString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeIntData(intVal)
 }
 
-func incrByFloatString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func incrByFloatString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "incrbyfloat" {
 		logger.Error("incrByFloatString func: cmdName != incrbyfloat")
 		return resp.MakeErrorData("Server error")
@@ -563,7 +564,7 @@ func incrByFloatString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	return resp.MakeBulkData([]byte(strconv.FormatFloat(floatVal, 'f', -1, 64)))
 }
 
-func appendString(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func appendString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[0])) != "append" {
 		logger.Error("appendString func: cmdName != append")
 		return resp.MakeErrorData("Server error")

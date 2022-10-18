@@ -1,6 +1,7 @@
 package memdb
 
 import (
+	"context"
 	"github.com/innovationb1ue/RedisGO/resp"
 	"net"
 	"strings"
@@ -14,7 +15,7 @@ var CmdTable = make(map[string]*command)
 // We allow executor to directly write message back to the tcp connection for some blocking commands.
 // But it should never be spoilt. Normal commands should always return a data but not write
 // into the pipe by themselves.
-type cmdExecutor func(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData
+type cmdExecutor func(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData
 
 type command struct {
 	executor cmdExecutor

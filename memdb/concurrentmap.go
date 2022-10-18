@@ -17,7 +17,7 @@ type ConcurrentMap struct {
 	count int // total number of keys
 }
 
-// shard is the minimal object that represents a k:v pair in redis
+// shard is the object that represents a k:v pair in redis
 type shard struct {
 	item map[string]any
 	rwMu *sync.RWMutex

@@ -51,10 +51,8 @@ func (m *ChanMap) Send(key string, val string) int {
 			key:  key,
 			val:  val,
 		}
-		channel.rw.Lock()
 		channel.in <- msg
-		channel.rw.Unlock()
-		go channel.Broadcast()
+		channel.Broadcast()
 		return channel.numSubs
 	}
 }
@@ -90,7 +88,7 @@ func (m *ChanMap) UnSubscribe(key string, ID string) {
 	} else {
 		channel = channelTmp.(*Chan)
 	}
-	// lock channel shard
+	// lock channel since modifying map
 	channel.rw.Lock()
 	defer channel.rw.Unlock()
 	// delete out record
@@ -119,15 +117,14 @@ func (m *ChanMap) Create(key string) *Chan {
 
 // Broadcast publish all the messages in {in} channel to all {out} channels
 func (c *Chan) Broadcast() {
-	// lock the shard
+	// do broadcast for exactly 1 message
+	elem := <-c.in
+	// lock the shard since clients may disconnect when we're forwarding messages
 	c.rw.RLock()
 	defer c.rw.RUnlock()
-	// do broadcast
-	for elem := range c.in {
-		for _, outChan := range c.out {
-			// "message", channel Names, Names
-			outChan <- elem
-		}
-		break
+	for _, outChan := range c.out {
+		// "message", channel Names, Names
+		outChan <- elem
 	}
+
 }

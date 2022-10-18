@@ -1,13 +1,14 @@
 package memdb
 
 import (
+	"context"
 	"fmt"
 	"github.com/innovationb1ue/RedisGO/resp"
 	"net"
 	"strconv"
 )
 
-func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
+func zadd(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 	if len(cmd) < 4 {
 		return resp.MakeWrongNumberArgs("zadd")
 	}
@@ -148,7 +149,7 @@ func zadd(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 	return resp.MakeIntData(retInt)
 }
 
-func zrange(m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
+func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 
 	return nil
 }

@@ -128,23 +128,23 @@ MSET (10 keys): 181323.66 requests per second, p50=0.199 msec
 ## Support Commands
 All commands used as [redis commands](https://redis.io/commands/). You can use any redis client to communicate with RedisGO.
 
-| key     | string      | list   | set         | hash         | channels   | sorted set |  
-|---------|-------------|--------|-------------|--------------|------------|------------|
-| del     | set         | llen   | sadd        | hdel         | subscribe* | zadd       |
-| exists  | get         | lindex | scard       | hexists      | publish*   |            |
-| keys    | getrange    | lpos   | sdiff       | hget         |            |            |
-| expire  | setrange    | lpop   | sdirrstore  | hgetall      |            |            |
-| persist | mget        | rpop   | sinter      | hincrby      |            |            |
-| ttl     | mset        | lpush  | sinterstore | hincrbyfloat |            |            |
-| type    | setex       | lpushx | sismember   | hkeys        |            |            |
-| rename  | setnx       | rpush  | smembers    | hlen         |            |            |
-|         | strlen      | rpushx | smove       | hmget        |            |            |
-|         | incr        | lset   | spop        | hset         |            |            |
-|         | incrby      | lrem   | srandmember | hsetnx       |            |            |
-|         | decr        | ltrim  | srem        | hvals        |            |            |
-|         | decrby      | lrange | sunion      | hstrlen      |            |            |
-|         | incrbyfloat | lmove  | sunionstore | hrandfield   |            |            |
-|         | append      | blpop  |             |              |            |            |
+| key     | string      | list   | set         | hash         | channels  | sorted set |  
+|---------|-------------|--------|-------------|--------------|-----------|------------|
+| del     | set         | llen   | sadd        | hdel         | subscribe | zadd       |
+| exists  | get         | lindex | scard       | hexists      | publish   | zrange*    |
+| keys    | getrange    | lpos   | sdiff       | hget         |           |            |
+| expire  | setrange    | lpop   | sdirrstore  | hgetall      |           |            |
+| persist | mget        | rpop   | sinter      | hincrby      |           |            |
+| ttl     | mset        | lpush  | sinterstore | hincrbyfloat |           |            |
+| type    | setex       | lpushx | sismember   | hkeys        |           |            |
+| rename  | setnx       | rpush  | smembers    | hlen         |           |            |
+|         | strlen      | rpushx | smove       | hmget        |           |            |
+|         | incr        | lset   | spop        | hset         |           |            |
+|         | incrby      | lrem   | srandmember | hsetnx       |           |            |
+|         | decr        | ltrim  | srem        | hvals        |           |            |
+|         | decrby      | lrange | sunion      | hstrlen      |           |            |
+|         | incrbyfloat | lmove  | sunionstore | hrandfield   |           |            |
+|         | append      | blpop  |             |              |           |            |
 |         |             | brpop  |             |
 
 *means partially implemented or is being worked on. 

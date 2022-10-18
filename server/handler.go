@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"io"
+	"log"
 	"net"
 
 	"github.com/innovationb1ue/RedisGO/logger"
@@ -24,12 +26,15 @@ func NewHandler() *Handler {
 
 // Handle distributes all the client command to execute
 func (h *Handler) Handle(conn net.Conn) {
+	ctx, cancel := context.WithCancel(context.Background())
 	// gracefully close the tcp connection to client
 	defer func() {
+		cancel()
 		err := conn.Close()
 		if err != nil {
 			logger.Error(err)
 		}
+		log.Println("stop handle one")
 	}()
 	// create a goroutine that reads from the client and pump data into ch
 	ch := resp.ParseStream(conn)
@@ -44,6 +49,7 @@ func (h *Handler) Handle(conn net.Conn) {
 			}
 			return
 		}
+		log.Println(string(parsedRes.Data.ByteData()))
 		// empty msg
 		if parsedRes.Data == nil {
 			logger.Error("empty parsedRes.Data from ", conn.RemoteAddr().String())
@@ -59,7 +65,7 @@ func (h *Handler) Handle(conn net.Conn) {
 		cmd := arrayData.ToCommand()
 		// run the string command
 		// also pass connection as an argument since the command may block and return continuous messages
-		res := h.memDb.ExecCommand(cmd, conn)
+		res := h.memDb.ExecCommand(ctx, cmd, conn)
 		// return result
 		if res != nil {
 			_, err := conn.Write(res.ToBytes())

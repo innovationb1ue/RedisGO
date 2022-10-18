@@ -3,6 +3,7 @@ package memdb
 import (
 	"context"
 	"github.com/innovationb1ue/RedisGO/resp"
+	"log"
 	"net"
 )
 
@@ -11,7 +12,7 @@ func RegisterPubSubCommands() {
 	RegisterCommand("publish", publish)
 }
 
-func subscribe(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func subscribe(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) < 2 {
 		return resp.MakeWrongNumberArgs("subscribe")
 	}
@@ -23,23 +24,21 @@ func subscribe(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	// aggregation channel. All subscribe channels will be forwarded to this channel
 	aggregate := make(chan *ChanMsg)
 
-	bg := context.Background()
-	localCtx, cancel := context.WithCancel(bg)
-	defer cancel()
-
 	// subscribe channels & start forwarding msg to aggregate
 	for _, key := range keys {
 		out, ID := m.SubChans.Subscribe(key)
 		// forwards all out channel to a single aggregate chan
 		go func(key string) {
+			defer log.Println("quit forwaring goroutine")
 			for {
 				select {
 				case msg := <-out:
 					// this will not block forever since we will drain the aggregate channel before closing this context
 					aggregate <- msg
-				case <-localCtx.Done():
+				case <-ctx.Done():
 					// Unsubscribe if the client is leaving
 					m.SubChans.UnSubscribe(key, ID)
+					return
 				}
 			}
 		}(key)
@@ -63,6 +62,7 @@ func subscribe(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 				resp.MakeBulkData([]byte(msg.val.(string))),
 			}).ToBytes())
 			// clients leaving. break the event loop
+			// todo: bug here. when client is not listening this wont immediately trigger.
 			if err != nil {
 				// drain the messages in aggregate. This prevents the forwarding goroutine from blocking forever
 				for range aggregate {
@@ -73,7 +73,7 @@ func subscribe(m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	}
 }
 
-func publish(m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisData {
+func publish(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisData {
 	if len(cmd) != 3 {
 		return resp.MakeWrongNumberArgs("publish")
 	}

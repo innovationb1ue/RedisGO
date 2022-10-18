@@ -53,9 +53,7 @@ func Start(cfg *config.Config) error {
 		case conn := <-clients:
 			logger.Info(conn.RemoteAddr().String(), " connected")
 			// start the worker goroutine
-			go func() {
-				handler.Handle(conn)
-			}()
+			go handler.Handle(conn)
 		// exit server
 		case sig := <-sigs:
 			if sig == syscall.SIGTERM || sig == syscall.SIGINT {

@@ -1,6 +1,7 @@
 package memdb
 
 import (
+	"context"
 	"net"
 	"strings"
 	"time"
@@ -31,7 +32,9 @@ func NewMemDb() *MemDb {
 	}
 }
 
-func (m *MemDb) ExecCommand(cmd [][]byte, conn net.Conn) resp.RedisData {
+func (m *MemDb) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) resp.RedisData {
+	cmdCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	if len(cmd) == 0 {
 		return nil
 	}
@@ -42,7 +45,7 @@ func (m *MemDb) ExecCommand(cmd [][]byte, conn net.Conn) resp.RedisData {
 	if !ok {
 		res = resp.MakeErrorData("ERR unknown command", cmdName)
 	} else {
-		res = command.executor(m, cmd, conn)
+		res = command.executor(cmdCtx, m, cmd, conn)
 	}
 	return res
 }
