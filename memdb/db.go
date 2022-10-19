@@ -33,8 +33,6 @@ func NewMemDb() *MemDb {
 }
 
 func (m *MemDb) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) resp.RedisData {
-	cmdCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	if len(cmd) == 0 {
 		return nil
 	}
@@ -45,7 +43,7 @@ func (m *MemDb) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) re
 	if !ok {
 		res = resp.MakeErrorData("ERR unknown command", cmdName)
 	} else {
-		res = command.executor(cmdCtx, m, cmd, conn)
+		res = command.executor(ctx, m, cmd, conn)
 	}
 	return res
 }

@@ -2,13 +2,12 @@ package server
 
 import (
 	"context"
-	"io"
-	"log"
-	"net"
-
 	"github.com/innovationb1ue/RedisGO/logger"
 	"github.com/innovationb1ue/RedisGO/memdb"
 	"github.com/innovationb1ue/RedisGO/resp"
+	"io"
+	"log"
+	"net"
 )
 
 // Handler handles all client requests to the server
@@ -34,7 +33,6 @@ func (h *Handler) Handle(conn net.Conn) {
 		if err != nil {
 			logger.Error(err)
 		}
-		log.Println("stop handle one")
 	}()
 	// create a goroutine that reads from the client and pump data into ch
 	ch := resp.ParseStream(conn)
@@ -49,7 +47,6 @@ func (h *Handler) Handle(conn net.Conn) {
 			}
 			return
 		}
-		log.Println(string(parsedRes.Data.ByteData()))
 		// empty msg
 		if parsedRes.Data == nil {
 			logger.Error("empty parsedRes.Data from ", conn.RemoteAddr().String())
@@ -80,7 +77,6 @@ func (h *Handler) Handle(conn net.Conn) {
 				logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
 			}
 		}
-
 	}
-
+	log.Println("ch closed")
 }

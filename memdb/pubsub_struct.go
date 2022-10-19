@@ -4,6 +4,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/innovationb1ue/RedisGO/config"
 	"github.com/innovationb1ue/RedisGO/logger"
+	"github.com/innovationb1ue/RedisGO/resp"
+	"net"
 	"sync"
 )
 
@@ -15,7 +17,7 @@ type ChanMap struct {
 // Chan is the shard used in PUB/SUB... commands
 type Chan struct {
 	in      chan *ChanMsg
-	out     map[string]chan *ChanMsg
+	conns   map[string]net.Conn
 	numSubs int
 	rw      *sync.RWMutex
 }
@@ -41,24 +43,30 @@ func (m *ChanMap) Send(key string, val string) int {
 		return 0
 	}
 	// send message and schedule broadcast event
-	channel, isChannel := channelTmp.(*Chan)
-	if !isChannel {
-		logger.Error("Fatal error: the element in channel map is not a channel shard!")
-		return 0
-	} else {
-		msg := &ChanMsg{
-			info: "message",
-			key:  key,
-			val:  val,
-		}
-		channel.in <- msg
-		channel.Broadcast()
-		return channel.numSubs
+	channel := channelTmp.(*Chan)
+	msg := &ChanMsg{
+		info: "message",
+		key:  key,
+		val:  val,
 	}
+	// block sending messages since we need to get the number of active clients
+	for k, c := range channel.conns {
+		_, err := c.Write(resp.MakeArrayData([]resp.RedisData{resp.MakeBulkData([]byte(msg.info)),
+			resp.MakeBulkData([]byte(msg.key)),
+			resp.MakeBulkData([]byte(msg.val.(string))),
+		}).ToBytes())
+		if err != nil {
+			_ = c.Close()
+			delete(channel.conns, k)
+			channel.numSubs--
+		}
+	}
+	return channel.numSubs
+
 }
 
 // Subscribe return a receiving chan and the ID of that chan based on the given key.
-func (m *ChanMap) Subscribe(key string) (<-chan *ChanMsg, string) {
+func (m *ChanMap) Subscribe(key string, conn net.Conn) string {
 	channelTmp, ok := m.item.Get(key)
 	var channel *Chan
 	// channel does not exist => create one
@@ -67,15 +75,14 @@ func (m *ChanMap) Subscribe(key string) (<-chan *ChanMsg, string) {
 	} else {
 		channel = channelTmp.(*Chan)
 	}
-	out := make(chan *ChanMsg)
 	// lock a single channel shard since modifying attribute
 	channel.rw.Lock()
 	defer channel.rw.Unlock()
+	connID := uuid.NewString()
+	channel.conns[connID] = conn
 	// register subscriber
 	channel.numSubs++
-	outID := uuid.NewString()
-	channel.out[outID] = out
-	return out, outID
+	return connID
 }
 
 func (m *ChanMap) UnSubscribe(key string, ID string) {
@@ -93,7 +100,7 @@ func (m *ChanMap) UnSubscribe(key string, ID string) {
 	defer channel.rw.Unlock()
 	// delete out record
 	channel.numSubs--
-	delete(channel.out, ID)
+	delete(channel.conns, ID)
 	// destroy channel with no subscribers to free memory
 	if channel.numSubs == 0 {
 		m.item.Delete(key)
@@ -106,25 +113,12 @@ func (m *ChanMap) Create(key string) *Chan {
 	// create if not exist
 	if _, ok := m.item.Get(key); !ok {
 		newShard = &Chan{
-			in:  make(chan *ChanMsg, config.Configures.ChanBufferSize),
-			out: make(map[string]chan *ChanMsg, config.Configures.ChanBufferSize),
-			rw:  &sync.RWMutex{},
+			in:      make(chan *ChanMsg, config.Configures.ChanBufferSize),
+			conns:   make(map[string]net.Conn, 0),
+			numSubs: 0,
+			rw:      &sync.RWMutex{},
 		}
 		m.item.Set(key, newShard)
 	}
 	return newShard
-}
-
-// Broadcast publish all the messages in {in} channel to all {out} channels
-func (c *Chan) Broadcast() {
-	// do broadcast for exactly 1 message
-	elem := <-c.in
-	// lock the shard since clients may disconnect when we're forwarding messages
-	c.rw.RLock()
-	defer c.rw.RUnlock()
-	for _, outChan := range c.out {
-		// "message", channel Names, Names
-		outChan <- elem
-	}
-
 }

@@ -30,7 +30,6 @@ type readState struct {
 func ParseStream(reader io.Reader) <-chan *ParsedRes {
 	ch := make(chan *ParsedRes)
 	go parse(reader, ch)
-	//go newParse(reader, ch)
 	return ch
 }
 
@@ -85,7 +84,7 @@ func parse(reader io.Reader, ch chan<- *ParsedRes) {
 			// read ended, stop reading.
 			if err == io.EOF {
 				ch <- &ParsedRes{
-					Err: err,
+					Err: io.EOF,
 				}
 				close(ch)
 				return
