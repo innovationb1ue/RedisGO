@@ -6,6 +6,7 @@ import (
 	"github.com/innovationb1ue/RedisGO/resp"
 	"net"
 	"strconv"
+	"strings"
 )
 
 type SortedSetMember struct {
@@ -165,26 +166,47 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		return resp.MakeWrongNumberArgs("zrange")
 	}
 	key := string(cmd[1])
-	start, err := strconv.Atoi(string(cmd[2]))
-	if err != nil {
-		return resp.MakeErrorData("ERR value is not an integer or out of range")
-	}
-	end, err := strconv.Atoi(string(cmd[3]))
-	if err != nil {
-		return resp.MakeErrorData("ERR value is not an integer or out of range")
-	}
-	var withscore, rev bool
+	var withscore, rev, byscore, bylex, limit bool
 
 	// parse options
 	for _, optionStr := range cmd[4:] {
-		switch string(optionStr) {
+		switch strings.ToLower(string(optionStr)) {
 		case "withscores":
 			withscore = true
 		case "rev":
 			rev = true
+		case "limit":
+			limit = true
+		case "byscore":
+			byscore = true
+		case "bylex":
+			bylex = true
+		}
+	}
+	// check invalid combination of options
+	if limit && !(byscore || bylex) {
+		return resp.MakeErrorData("ERR syntax error, LIMIT is only supported in combination with either BYSCORE or BYLEX")
+	}
+	if bylex && withscore {
+		return resp.MakeErrorData("ERR syntax error, WITHSCORES not supported in combination with BYLEX")
+	}
+	if bylex && rev {
+		return resp.MakeArrayData([]resp.RedisData{})
+	}
+	var start, end int
+	var err error
+	if !byscore && !bylex {
+		start, err = strconv.Atoi(string(cmd[2]))
+		if err != nil {
+			return resp.MakeErrorData("ERR value is not an integer or out of range")
+		}
+		end, err = strconv.Atoi(string(cmd[3]))
+		if err != nil {
+			return resp.MakeErrorData("ERR value is not an integer or out of range")
 		}
 	}
 
+	// retrive the key
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
 	var sortedSet *SortedSet[*SortedSetNode]
@@ -197,25 +219,102 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 			return resp.MakeWrongType()
 		}
 	}
-	res := make([]resp.RedisData, 0)
+	// get set length
+	maxLen := sortedSet.Len()
+	if end > maxLen {
+		end = maxLen
+	}
+	// traverse btree for all elements , members are in ascend order
+	members := make([]*SortedSetMember, 0, maxLen)
 	sortedSet.Ascend(func(node *Node[*SortedSetNode], int2 int) bool {
 		names := node.Value.GetNames()
 		score := node.Value.GetScore()
 		for n := range names {
-			res = append(res, resp.MakeBulkData([]byte(n)))
-			if withscore {
-				res = append(res, resp.MakeBulkData([]byte(fmt.Sprintf("%f", score))))
-			}
+			members = append(members, &SortedSetMember{name: n, score: score})
 		}
 		return true
 	})
-	var maxLen int
-	if end >= len(res) {
-		maxLen = len(res)
-	} else {
-		maxLen = end + 1
+	// special handling for byscore
+	if byscore {
+		var leftopen, rightopen bool
+		var min, max float64
+		var err error
+		// get range interval (default is closed interval for both sides)
+		if cmd[2][0] == '(' {
+			min, err = strconv.ParseFloat(string(cmd[2][1:]), 64)
+			leftopen = true
+		} else {
+			min, err = strconv.ParseFloat(string(cmd[2]), 64)
+		}
+		if cmd[3][0] == '(' {
+			max, err = strconv.ParseFloat(string(cmd[3][1:]), 64)
+			rightopen = true
+		} else {
+			max, err = strconv.ParseFloat(string(cmd[3]), 64)
+		}
+		if err != nil {
+			return resp.MakeErrorData("ERR min or max is not a float")
+		}
+		scoreIdxStart := -1
+		scoreIdxEnd := -1
+		// retrieve members based on the interval
+		if !leftopen && !rightopen {
+			for idx, member := range members {
+				if member.score >= min && member.score <= max && scoreIdxStart == -1 {
+					scoreIdxStart = idx
+				} else if member.score > max && scoreIdxEnd == -1 {
+					scoreIdxEnd = idx - 1 // by all means do not include this one
+					break
+				}
+			}
+		} else if leftopen && !rightopen {
+			for idx, member := range members {
+				if member.score > min && member.score <= max && scoreIdxStart == -1 {
+					scoreIdxStart = idx
+				} else if member.score > max && scoreIdxEnd == -1 {
+					scoreIdxEnd = idx - 1 // by all means do not include this one
+					break
+				}
+			}
+		} else if !leftopen && rightopen {
+			for idx, member := range members {
+				if member.score >= min && member.score < max && scoreIdxStart == -1 {
+					scoreIdxStart = idx
+				} else if member.score >= max && scoreIdxEnd == -1 {
+					scoreIdxEnd = idx - 1 // by all means do not include this one
+					break
+				}
+			}
+		}
+		// middle of members till the end. (idxStart got but idxEnd is missing, we assign End to max length)
+		if scoreIdxStart >= 0 && scoreIdxEnd == -1 {
+			scoreIdxEnd = maxLen
+		}
+		if scoreIdxStart >= 0 {
+			res := make([]resp.RedisData, 0)
+			for _, member := range members[scoreIdxStart : scoreIdxEnd+1] {
+				name := member.name
+				score := member.score
+				res = append(res, resp.MakeBulkData([]byte(name)))
+				if withscore {
+					res = append(res, resp.MakeBulkData([]byte(fmt.Sprintf("%f", score))))
+				}
+			}
+			return resp.MakeArrayData(res)
+		} else {
+			return resp.MakeArrayData([]resp.RedisData{})
+		}
 	}
-
+	// normal ZRANGE
+	res := make([]resp.RedisData, 0)
+	for _, member := range members {
+		name := member.name
+		score := member.score
+		res = append(res, resp.MakeBulkData([]byte(name)))
+		if withscore {
+			res = append(res, resp.MakeBulkData([]byte(fmt.Sprintf("%f", score))))
+		}
+	}
 	res = res[start:maxLen]
 	if rev {
 		res = reverse[[]resp.RedisData](res)
