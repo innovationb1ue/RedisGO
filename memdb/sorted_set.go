@@ -167,9 +167,11 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 	}
 	key := string(cmd[1])
 	var withscore, rev, byscore, bylex, limit bool
+	var offset, count int
+	var err error
 
 	// parse options
-	for _, optionStr := range cmd[4:] {
+	for i, optionStr := range cmd[4:] {
 		switch strings.ToLower(string(optionStr)) {
 		case "withscores":
 			withscore = true
@@ -177,6 +179,18 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 			rev = true
 		case "limit":
 			limit = true
+			if i+2 >= len(cmd) {
+				return resp.MakeErrorData("ERR syntax error")
+			}
+			// when met limit keyword, we need to process the following offset and count
+			offset, err = strconv.Atoi(string(cmd[i+4+1]))
+			if err != nil {
+				return resp.MakeErrorData("ERR value is not an integer or out of range")
+			}
+			count, err = strconv.Atoi(string(cmd[i+4+2]))
+			if err != nil {
+				return resp.MakeErrorData("ERR value is not an integer or out of range")
+			}
 		case "byscore":
 			byscore = true
 		case "bylex":
@@ -184,6 +198,8 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		}
 	}
 	// check invalid combination of options
+
+	// limit is always used with byscore or bylex
 	if limit && !(byscore || bylex) {
 		return resp.MakeErrorData("ERR syntax error, LIMIT is only supported in combination with either BYSCORE or BYLEX")
 	}
@@ -194,7 +210,6 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		return resp.MakeArrayData([]resp.RedisData{})
 	}
 	var start, end int
-	var err error
 	if !byscore && !bylex {
 		start, err = strconv.Atoi(string(cmd[2]))
 		if err != nil {
@@ -234,12 +249,12 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		}
 		return true
 	})
-	// special handling for byscore
+	// special handling for byscore. entering this condition will return the whole function inside
 	if byscore {
 		var leftopen, rightopen bool
 		var min, max float64
 		var err error
-		// get range interval (default is closed interval for both sides)
+		// get range interval (default is closed interval)
 		if cmd[2][0] == '(' {
 			min, err = strconv.ParseFloat(string(cmd[2][1:]), 64)
 			leftopen = true
@@ -290,22 +305,41 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		if scoreIdxStart >= 0 && scoreIdxEnd == -1 {
 			scoreIdxEnd = maxLen
 		}
+		members = members[scoreIdxStart : scoreIdxEnd+1]
+		// build response if there is any member fall into the interval
 		if scoreIdxStart >= 0 {
 			res := make([]resp.RedisData, 0)
-			for _, member := range members[scoreIdxStart : scoreIdxEnd+1] {
+			// handle offset and limit if specified
+			if limit {
+				if offset >= len(members) || offset < 0 {
+					return resp.MakeArrayData([]resp.RedisData{})
+				}
+				// shift members rightward with offset
+				members = members[offset:]
+				// save only {count} members
+				if count > 0 && count <= len(members) {
+					members = members[:count]
+				}
+			}
+
+			// make response
+			for _, member := range members {
 				name := member.name
 				score := member.score
 				res = append(res, resp.MakeBulkData([]byte(name)))
+				// if specified withscores option, also add member scores in the response
 				if withscore {
 					res = append(res, resp.MakeBulkData([]byte(fmt.Sprintf("%f", score))))
 				}
 			}
+
 			return resp.MakeArrayData(res)
 		} else {
+			// no member in the interval, just return empty array
 			return resp.MakeArrayData([]resp.RedisData{})
 		}
 	}
-	// normal ZRANGE
+	// normal ZRANGE without byscore|bylex|
 	res := make([]resp.RedisData, 0)
 	for _, member := range members {
 		name := member.name
