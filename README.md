@@ -109,6 +109,7 @@ SADD: 186915.88 requests per second, p50=0.135 msec
 HSET: 185873.61 requests per second, p50=0.143 msec                    
 SPOP: 188501.42 requests per second, p50=0.135 msec                    
 MSET (10 keys): 139275.77 requests per second, p50=0.199 msec    
+zrange a 0 100 withscores: rps=161032.0 (overall: 152203.6) avg_msec=0.193
 ```
 
 ```text
@@ -123,6 +124,7 @@ SADD: 201409.88 requests per second, p50=0.135 msec
 HSET: 201409.88 requests per second, p50=0.135 msec                    
 SPOP: 212765.95 requests per second, p50=0.127 msec                    
 MSET (10 keys): 181323.66 requests per second, p50=0.199 msec 
+zrange a 0 100 withscores: 165016.50 requests per second, p50=0.175 msec
 ```
 
 ## Support Commands
