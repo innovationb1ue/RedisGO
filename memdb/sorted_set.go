@@ -191,8 +191,10 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 			if err != nil {
 				return resp.MakeErrorData("ERR value is not an integer or out of range")
 			}
+		// never use this option. this is an awful option provided by Redis. we return empty here.
 		case "byscore":
 			byscore = true
+			return resp.MakeArrayData([]resp.RedisData{})
 		case "bylex":
 			bylex = true
 		}

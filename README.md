@@ -128,10 +128,12 @@ MSET (10 keys): 181323.66 requests per second, p50=0.199 msec
 ## Support Commands
 All commands used as [redis commands](https://redis.io/commands/). You can use any redis client to communicate with RedisGO.
 
+
+
 | key     | string      | list   | set         | hash         | channels  | sorted set |  
 |---------|-------------|--------|-------------|--------------|-----------|------------|
 | del     | set         | llen   | sadd        | hdel         | subscribe | zadd       |
-| exists  | get         | lindex | scard       | hexists      | publish   | zrange*    |
+| exists  | get         | lindex | scard       | hexists      | publish   | zrange     |
 | keys    | getrange    | lpos   | sdiff       | hget         |           |            |
 | expire  | setrange    | lpop   | sdirrstore  | hgetall      |           |            |
 | persist | mget        | rpop   | sinter      | hincrby      |           |            |
@@ -147,4 +149,9 @@ All commands used as [redis commands](https://redis.io/commands/). You can use a
 |         | append      | blpop  |             |              |           |            |
 |         |             | brpop  |             |
 
-*means partially implemented or is being worked on. 
+*means partially implemented or is being worked on.
+
+#### PS:
+* **Lexicographical ranges**(BYLEX) in ZRANGE should never be used since it is barely useful and too complex to implement.
+you can easily sort your result in lexicographical order in your code and please don't let Redis do it for you. This option also implicitly assume all members have the same score, which might be misleading and confusing. 
+If members have different scores the reply will be unspecified. 
