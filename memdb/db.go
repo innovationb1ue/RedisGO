@@ -41,7 +41,7 @@ func (m *MemDb) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) re
 	// get the command from hash table and execute it.
 	command, ok := CmdTable[cmdName]
 	if !ok {
-		res = resp.MakeErrorData("ERR unknown command", cmdName)
+		res = resp.MakeErrorData("ERR unknown command ", cmdName)
 	} else {
 		res = command.executor(ctx, m, cmd, conn)
 	}

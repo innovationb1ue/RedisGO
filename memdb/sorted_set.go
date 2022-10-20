@@ -8,6 +8,18 @@ import (
 	"strconv"
 )
 
+type SortedSetMember struct {
+	name  string
+	score float64
+}
+
+func reverse[S ~[]E, E any](s S) S {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+	return s
+}
+
 func zadd(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
 	if len(cmd) < 4 {
 		return resp.MakeWrongNumberArgs("zadd")
@@ -54,12 +66,11 @@ func zadd(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisDat
 	if incr && len(cmd) != 5 {
 		return resp.MakeErrorData("ERR INCR option supports a single increment-element pair")
 	}
-
+	// declare sortedSet data structure
+	var sortedSet *SortedSet[*SortedSetNode]
 	// lock the key
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
-	// declare sortedSet data structure
-	var sortedSet *SortedSet[*SortedSetNode]
 	// get key, create a new sorted list if the key does not exist
 	SortedsetTmp, ok := m.db.Get(key)
 	if !ok {
@@ -150,8 +161,66 @@ func zadd(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisDat
 }
 
 func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
+	if len(cmd) < 4 {
+		return resp.MakeWrongNumberArgs("zrange")
+	}
+	key := string(cmd[1])
+	start, err := strconv.Atoi(string(cmd[2]))
+	if err != nil {
+		return resp.MakeErrorData("ERR value is not an integer or out of range")
+	}
+	end, err := strconv.Atoi(string(cmd[3]))
+	if err != nil {
+		return resp.MakeErrorData("ERR value is not an integer or out of range")
+	}
+	var withscore, rev bool
 
-	return nil
+	// parse options
+	for _, optionStr := range cmd[4:] {
+		switch string(optionStr) {
+		case "withscores":
+			withscore = true
+		case "rev":
+			rev = true
+		}
+	}
+
+	m.locks.Lock(key)
+	defer m.locks.UnLock(key)
+	var sortedSet *SortedSet[*SortedSetNode]
+	sortedSetTmp, ok := m.db.Get(key)
+	if !ok {
+		return resp.MakeArrayData([]resp.RedisData{})
+	} else {
+		sortedSet, ok = sortedSetTmp.(*SortedSet[*SortedSetNode])
+		if !ok {
+			return resp.MakeWrongType()
+		}
+	}
+	res := make([]resp.RedisData, 0)
+	sortedSet.Ascend(func(node *Node[*SortedSetNode], int2 int) bool {
+		names := node.Value.GetNames()
+		score := node.Value.GetScore()
+		for n := range names {
+			res = append(res, resp.MakeBulkData([]byte(n)))
+			if withscore {
+				res = append(res, resp.MakeBulkData([]byte(fmt.Sprintf("%f", score))))
+			}
+		}
+		return true
+	})
+	var maxLen int
+	if end >= len(res) {
+		maxLen = len(res)
+	} else {
+		maxLen = end + 1
+	}
+
+	res = res[start:maxLen]
+	if rev {
+		res = reverse[[]resp.RedisData](res)
+	}
+	return resp.MakeArrayData(res)
 }
 
 func RegisterSortedSetCommands() {

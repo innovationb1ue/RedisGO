@@ -373,7 +373,7 @@ func (t *Btree[T]) Pull() Val {
 }
 
 // NodeIterator expresses the iterator function used for traversals
-type NodeIterator[T Val] func(n *Node[T], i int) bool
+type NodeIterator[T Val] func(node *Node[T], i int) bool
 
 // Ascend performs an ascending order traversal of the tree calling the iterator function on each node
 // the iterator will continue as long as the NodeIterator returns true
