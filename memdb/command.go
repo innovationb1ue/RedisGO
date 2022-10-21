@@ -18,12 +18,12 @@ var CmdTable = make(map[string]*command)
 type cmdExecutor func(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData
 
 type command struct {
-	executor cmdExecutor
+	Executor cmdExecutor
 }
 
 func RegisterCommand(cmdName string, executor cmdExecutor) {
 	CmdTable[cmdName] = &command{
-		executor: executor,
+		Executor: executor,
 	}
 }
 

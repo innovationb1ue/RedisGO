@@ -2,29 +2,39 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"github.com/innovationb1ue/RedisGO/config"
 	"github.com/innovationb1ue/RedisGO/logger"
 	"github.com/innovationb1ue/RedisGO/memdb"
 	"github.com/innovationb1ue/RedisGO/resp"
 	"io"
 	"log"
 	"net"
+	"strconv"
+	"strings"
 )
 
-// Handler handles all client requests to the server
-// It holds a MemDb instance to exchange data with clients
-type Handler struct {
+// Manager handles all client requests to the server
+// It holds multiple MemDb instances
+type Manager struct {
 	memDb *memdb.MemDb
+	DBs   []*memdb.MemDb
 }
 
-// NewHandler creates a default Handler
-func NewHandler() *Handler {
-	return &Handler{
-		memDb: memdb.NewMemDb(),
+// NewManager creates a default Manager
+func NewManager(cfg *config.Config) *Manager {
+	DBs := make([]*memdb.MemDb, cfg.Databases)
+	for i := 0; i < cfg.Databases; i++ {
+		DBs[i] = memdb.NewMemDb()
+	}
+	return &Manager{
+		memDb: DBs[0],
+		DBs:   DBs,
 	}
 }
 
 // Handle distributes all the client command to execute
-func (h *Handler) Handle(conn net.Conn) {
+func (m *Manager) Handle(conn net.Conn) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// gracefully close the tcp connection to client
 	defer func() {
@@ -62,7 +72,7 @@ func (h *Handler) Handle(conn net.Conn) {
 		cmd := arrayData.ToCommand()
 		// run the string command
 		// also pass connection as an argument since the command may block and return continuous messages
-		res := h.memDb.ExecCommand(ctx, cmd, conn)
+		res := m.ExecCommand(ctx, cmd, conn)
 		// return result
 		if res != nil {
 			_, err := conn.Write(res.ToBytes())
@@ -79,4 +89,40 @@ func (h *Handler) Handle(conn net.Conn) {
 		}
 	}
 	log.Println("ch closed")
+}
+
+func (m *Manager) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) resp.RedisData {
+	if len(cmd) == 0 {
+		return nil
+	}
+	var res resp.RedisData
+	cmdName := strings.ToLower(string(cmd[0]))
+	// global commands
+	switch cmdName {
+	case "select":
+		return m.Select(cmd)
+	}
+	// get the command from hash table and execute it.
+	command, ok := memdb.CmdTable[cmdName]
+	if !ok {
+		res = resp.MakeErrorData("ERR unknown command ", cmdName)
+	} else {
+		res = command.Executor(ctx, m.memDb, cmd, conn)
+	}
+	return res
+}
+
+func (m *Manager) Select(cmd [][]byte) resp.RedisData {
+	if len(cmd) != 2 {
+		return resp.MakeWrongNumberArgs("select")
+	}
+	dbIdx, err := strconv.Atoi(string(cmd[1]))
+	if err != nil {
+		return resp.MakeErrorData("ERR value is not an integer or out of range")
+	}
+	if dbIdx >= len(m.DBs) || dbIdx < 0 {
+		return resp.MakeErrorData(fmt.Sprintf("ERR DB index is out of range with maximum %d", len(m.DBs)))
+	}
+	m.memDb = m.DBs[dbIdx]
+	return resp.MakeStringData("OK")
 }

@@ -35,7 +35,8 @@ func Start(cfg *config.Config) error {
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 	// client chan
 	clients := make(chan net.Conn)
-	handler := NewHandler()
+	// create n db for SELECT cmd
+	mgr := NewManager(cfg)
 	// spawn a worker to accept tcp connections & create client objects
 	go func() {
 		for {
@@ -53,7 +54,7 @@ func Start(cfg *config.Config) error {
 		case conn := <-clients:
 			logger.Info(conn.RemoteAddr().String(), " connected")
 			// start the worker goroutine
-			go handler.Handle(conn)
+			go mgr.Handle(conn)
 		// exit server
 		case sig := <-sigs:
 			if sig == syscall.SIGTERM || sig == syscall.SIGINT {

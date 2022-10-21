@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -20,6 +21,7 @@ var (
 	defaultLogLevel       = "info"
 	defaultShardNum       = 1024
 	defaultChanBufferSize = 10
+	configFile            = "./config/test.conf"
 )
 
 type Config struct {
@@ -30,6 +32,8 @@ type Config struct {
 	LogLevel       string
 	ShardNum       int
 	ChanBufferSize int
+	Databases      int
+	Others         map[string]any
 }
 
 type CfgError struct {
@@ -41,7 +45,7 @@ func (cErr *CfgError) Error() string {
 }
 
 func flagInit(cfg *Config) {
-	flag.StringVar(&(cfg.ConfFile), "config", "", "Appoint a config file: such as /etc/redis.conf")
+	flag.StringVar(&(cfg.ConfFile), "config", configFile, "Appoint a config file: such as /etc/redis.conf")
 	flag.StringVar(&(cfg.Host), "host", defaultHost, "Bind host ip: default is 127.0.0.1")
 	flag.IntVar(&(cfg.Port), "port", defaultPort, "Bind a listening port: default is 6379")
 	flag.StringVar(&(cfg.LogDir), "logdir", defaultLogDir, "Create log directory: default is /tmp")
@@ -52,15 +56,17 @@ func flagInit(cfg *Config) {
 // Setup initialize configs and do some validation checking.
 // Return configured Config pointer and error.
 func Setup() (*Config, error) {
-
 	cfg := &Config{
-		Host:     defaultHost,
-		Port:     defaultPort,
-		LogDir:   defaultLogDir,
-		LogLevel: defaultLogLevel,
-		ShardNum: defaultShardNum,
+		ConfFile:       configFile,
+		Host:           defaultHost,
+		Port:           defaultPort,
+		LogDir:         defaultLogDir,
+		LogLevel:       defaultLogLevel,
+		ShardNum:       defaultShardNum,
+		ChanBufferSize: defaultChanBufferSize,
+		Databases:      16,
+		Others:         make(map[string]any),
 	}
-
 	flagInit(cfg)
 	flag.Parse()
 	if cfg.ConfFile != "" {
@@ -113,7 +119,8 @@ func (cfg *Config) Parse(cfgFile string) error {
 		fields := strings.Fields(line)
 		if len(fields) >= 2 {
 			cfgName := strings.ToLower(fields[0])
-			if cfgName == "host" {
+			switch cfgName {
+			case "host":
 				if ip := net.ParseIP(fields[1]); ip == nil {
 					ipErr := &CfgError{
 						message: fmt.Sprintf("Given ip address %s is invalid", cfg.Host),
@@ -121,7 +128,7 @@ func (cfg *Config) Parse(cfgFile string) error {
 					return ipErr
 				}
 				cfg.Host = fields[1]
-			} else if cfgName == "port" {
+			case "port":
 				port, err := strconv.Atoi(fields[1])
 				if err != nil {
 					return err
@@ -133,16 +140,26 @@ func (cfg *Config) Parse(cfgFile string) error {
 					return portErr
 				}
 				cfg.Port = port
-			} else if cfgName == "logdir" {
+			case "logdir":
 				cfg.LogDir = strings.ToLower(fields[1])
-			} else if cfgName == "loglevel" {
+			case "loglevel":
 				cfg.LogLevel = strings.ToLower(fields[1])
-			} else if cfgName == "shardnum" {
+			case "shardnum":
 				cfg.ShardNum, err = strconv.Atoi(fields[1])
 				if err != nil {
 					fmt.Println("ShardNum should be a number. Get: ", fields[1])
 					panic(err)
 				}
+			case "databases":
+				cfg.Databases, err = strconv.Atoi(fields[1])
+				if err != nil {
+					log.Fatal("Databases should be an integer. Get: ", fields[1])
+				}
+				if cfg.Databases <= 0 {
+					log.Fatal("Databases should be an positive integer. Get: ", fields[1])
+				}
+			default:
+				cfg.Others[cfgName] = fields[1]
 			}
 		}
 		if ioErr == io.EOF {

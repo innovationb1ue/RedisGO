@@ -43,7 +43,7 @@ func (m *MemDb) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) re
 	if !ok {
 		res = resp.MakeErrorData("ERR unknown command ", cmdName)
 	} else {
-		res = command.executor(ctx, m, cmd, conn)
+		res = command.Executor(ctx, m, cmd, conn)
 	}
 	return res
 }
