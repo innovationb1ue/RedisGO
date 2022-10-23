@@ -8,7 +8,6 @@ import (
 	"github.com/innovationb1ue/RedisGO/memdb"
 	"github.com/innovationb1ue/RedisGO/resp"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -34,7 +33,7 @@ func NewManager(cfg *config.Config) *Manager {
 }
 
 // Handle distributes all the client command to execute
-func (m *Manager) Handle(conn net.Conn) {
+func (m *Manager) Handle(conn net.Conn, close <-chan struct{}) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// gracefully close the tcp connection to client
 	defer func() {
@@ -47,48 +46,53 @@ func (m *Manager) Handle(conn net.Conn) {
 	// create a goroutine that reads from the client and pump data into ch
 	ch := resp.ParseStream(conn)
 	// parsedRes is a complete command read from client
-	for parsedRes := range ch {
-		// handle errors
-		if parsedRes.Err != nil {
-			if parsedRes.Err == io.EOF {
-				logger.Info("Close connection ", conn.RemoteAddr().String())
-			} else {
-				logger.Panic("Handle connection ", conn.RemoteAddr().String(), " panic: ", parsedRes.Err.Error())
+	for {
+		select {
+		case parsedRes := <-ch:
+			// handle errors
+			if parsedRes.Err != nil {
+				if parsedRes.Err == io.EOF {
+					logger.Info("Close connection ", conn.RemoteAddr().String())
+				} else {
+					logger.Panic("Handle connection ", conn.RemoteAddr().String(), " panic: ", parsedRes.Err.Error())
+				}
+				return
 			}
+			// empty msg
+			if parsedRes.Data == nil {
+				logger.Error("empty parsedRes.Data from ", conn.RemoteAddr().String())
+				continue
+			}
+			// handling array command
+			arrayData, ok := parsedRes.Data.(*resp.ArrayData)
+			if !ok {
+				logger.Error("parsedRes.Data is not ArrayData from ", conn.RemoteAddr().String())
+				continue
+			}
+			// extract [][]bytes command
+			cmd := arrayData.ToCommand()
+			// run the string command
+			// also pass connection as an argument since the command may block and return continuous messages
+			res := m.ExecCommand(ctx, cmd, conn)
+			// return result
+			if res != nil {
+				_, err := conn.Write(res.ToBytes())
+				if err != nil {
+					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
+				}
+			} else {
+				// return error
+				errData := resp.MakeErrorData("unknown error")
+				_, err := conn.Write(errData.ToBytes())
+				if err != nil {
+					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
+				}
+			}
+		case <-close:
+			_ = conn.Close()
 			return
 		}
-		// empty msg
-		if parsedRes.Data == nil {
-			logger.Error("empty parsedRes.Data from ", conn.RemoteAddr().String())
-			continue
-		}
-		// handling array command
-		arrayData, ok := parsedRes.Data.(*resp.ArrayData)
-		if !ok {
-			logger.Error("parsedRes.Data is not ArrayData from ", conn.RemoteAddr().String())
-			continue
-		}
-		// extract [][]bytes command
-		cmd := arrayData.ToCommand()
-		// run the string command
-		// also pass connection as an argument since the command may block and return continuous messages
-		res := m.ExecCommand(ctx, cmd, conn)
-		// return result
-		if res != nil {
-			_, err := conn.Write(res.ToBytes())
-			if err != nil {
-				logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
-			}
-		} else {
-			// return error
-			errData := resp.MakeErrorData("unknown error")
-			_, err := conn.Write(errData.ToBytes())
-			if err != nil {
-				logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
-			}
-		}
 	}
-	log.Println("ch closed")
 }
 
 func (m *Manager) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) resp.RedisData {

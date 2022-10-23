@@ -5,8 +5,10 @@ import (
 	"strconv"
 )
 
-// this file implements data structure for resp
+// todo:make shared string objects to optimize running speed.
+// template strings should only be allocated once at compile time.
 
+// this file implements data structure for resp
 var (
 	CRLF = "\r\n"
 )
