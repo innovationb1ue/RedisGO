@@ -108,11 +108,11 @@ func expireKey(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.
 			res = m.SetTTL(key, ttl)
 		}
 	case "gt":
-		if v, ok := m.ttlKeys.Get(key); ok && ttl > v.(int64) {
+		if v, ok := m.ttlKeys.Get(key); ok && ttl > v.(*TTLInfo).value {
 			res = m.SetTTL(key, ttl)
 		}
 	case "lt":
-		if v, ok := m.ttlKeys.Get(key); ok && ttl < v.(int64) {
+		if v, ok := m.ttlKeys.Get(key); ok && ttl < v.(*TTLInfo).value {
 			res = m.SetTTL(key, ttl)
 		}
 	default:
@@ -164,7 +164,7 @@ func ttlKey(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.Red
 	if !ok {
 		return resp.MakeIntData(int64(-1))
 	}
-	return resp.MakeIntData(ttl.(int64) - now)
+	return resp.MakeIntData(ttl.(*TTLInfo).value - now)
 }
 
 func typeKey(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
