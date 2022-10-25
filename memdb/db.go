@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"context"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -73,13 +74,22 @@ func (m *MemDb) CheckTTL(key string) bool {
 // SetTTL set ttl for key
 // return bool to check if ttl set success
 // return int to check if the key is a new ttl key
+// value: seconds at expire
 func (m *MemDb) SetTTL(key string, value int64) int {
 	if _, ok := m.db.Get(key); !ok {
 		logger.Debug("SetTTL: key not exist")
 		return 0
 	}
-
+	// save TTL
 	m.ttlKeys.Set(key, value)
+	// start TTL check timed task
+	go func() {
+		// this chan fires after the ttl expire
+		<-time.After(time.Duration(value-time.Now().Unix()) * time.Second)
+		// CheckTTL locks itself
+		m.CheckTTL(key)
+		log.Println("TLL fires")
+	}()
 	return 1
 }
 

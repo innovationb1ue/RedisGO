@@ -118,7 +118,7 @@ func expireKey(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.
 	default:
 		if opt != "" {
 			logger.Error("expireKey Function: opt %s is not nx, xx, gt or lt", opt)
-			return resp.MakeErrorData(fmt.Sprintf("error: unsupport %s, except nx, xx, gt, lt", opt))
+			return resp.MakeErrorData(fmt.Sprintf("ERR Unsupported option %s, except nx, xx, gt, lt", opt))
 		}
 		res = m.SetTTL(key, ttl)
 	}

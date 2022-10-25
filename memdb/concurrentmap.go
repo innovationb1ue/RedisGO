@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/innovationb1ue/RedisGO/util"
 )
@@ -13,11 +14,10 @@ const MaxConSize = int(1<<31 - 1)
 // it supports maximum table size = MaxConSize
 type ConcurrentMap struct {
 	table []*shard
-	size  int // table size
-	count int // total number of keys
+	size  int   // table size (fixed)
+	count int64 // total number of keys
 }
 
-// todo:rewrite shards to use sync.Map
 // shard is the object that represents a k:v pair in redis
 type shard struct {
 	item map[string]any
@@ -113,12 +113,13 @@ func (m *ConcurrentMap) Delete(key string) int {
 		delete(shard.item, key)
 		m.count--
 		return 1
+	} else {
+		return 0
 	}
-	return 0
 }
 
-func (m *ConcurrentMap) Len() int {
-	return m.count
+func (m *ConcurrentMap) Len() int64 {
+	return atomic.LoadInt64(&m.count)
 }
 
 func (m *ConcurrentMap) Clear() {
