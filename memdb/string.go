@@ -19,8 +19,6 @@ func setString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.
 		return resp.MakeErrorData("error: commands is invalid")
 	}
 
-	m.CheckTTL(cmdKey) // check ttl first. if an old key is expired, the key will be deleted.
-
 	// check option params
 	var err error
 	var nx, xx, get, ex, px, keepttl, exat bool
@@ -120,12 +118,11 @@ func setString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.
 			res = resp.MakeBulkData(oldTypeVal)
 		}
 	}
-
-	// set ttl after key is existed
+	// delete old ttl if it is not preserved
 	if !keepttl {
 		m.DelTTL(cmdKey)
 	}
-
+	// set ttl
 	if ex {
 		m.SetTTL(cmdKey, time.Now().Unix()+exval)
 	}
@@ -149,9 +146,6 @@ func getString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.
 	}
 
 	key := string(cmd[1])
-	if !m.CheckTTL(key) {
-		return resp.MakeBulkData(nil)
-	}
 
 	m.locks.RLock(key)
 	defer m.locks.RUnLock(key)
@@ -177,9 +171,6 @@ func getRangeString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) 
 	}
 
 	key := string(cmd[1])
-	if !m.CheckTTL(key) {
-		return resp.MakeBulkData(nil)
-	}
 
 	m.locks.RLock(key)
 	defer m.locks.RUnLock(key)
@@ -238,8 +229,6 @@ func setRangeString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) 
 	var newVal []byte
 	key := string(cmd[1])
 
-	m.CheckTTL(key) // check ttl first. if a key is expired, the key will be deleted.
-
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
 
@@ -277,10 +266,6 @@ func mGetString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp
 	res := make([]resp.RedisData, 0)
 	for i := 1; i < len(cmd); i++ {
 		key := string(cmd[i])
-		if !m.CheckTTL(key) {
-			res = append(res, resp.MakeBulkData(nil))
-			continue
-		}
 		m.locks.RLock(key)
 		val, ok := m.db.Get(key)
 		m.locks.RUnLock(key)
@@ -360,7 +345,6 @@ func setNxString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) res
 
 	key := string(cmd[1])
 	val := cmd[2]
-	m.CheckTTL(key)
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
@@ -378,7 +362,6 @@ func strLenString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) re
 		return resp.MakeErrorData("error: commands is invalid")
 	}
 	key := string(cmd[1])
-	m.CheckTTL(key)
 
 	m.locks.RLock(key)
 	defer m.locks.RUnLock(key)
@@ -403,7 +386,6 @@ func incrString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp
 		return resp.MakeErrorData("error: commands is invalid")
 	}
 	key := string(cmd[1])
-	m.CheckTTL(key)
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
@@ -438,7 +420,6 @@ func incrByString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) re
 	if err != nil {
 		return resp.MakeErrorData("commands invalid: increment value is not an integer")
 	}
-	m.CheckTTL(key)
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
@@ -469,7 +450,6 @@ func decrString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp
 		return resp.MakeErrorData("error: commands is invalid")
 	}
 	key := string(cmd[1])
-	m.CheckTTL(key)
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
@@ -504,7 +484,6 @@ func decrByString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) re
 	if err != nil {
 		return resp.MakeErrorData("commands invalid: increment value is not an integer")
 	}
-	m.CheckTTL(key)
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
@@ -541,8 +520,6 @@ func incrByFloatString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Con
 		return resp.MakeErrorData("commands invalid: increment value is not an float")
 	}
 
-	m.CheckTTL(key)
-
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
 
@@ -574,7 +551,6 @@ func appendString(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) re
 	}
 	key := string(cmd[1])
 	val := cmd[2]
-	m.CheckTTL(key)
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)

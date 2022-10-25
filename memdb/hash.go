@@ -23,9 +23,6 @@ func hDelHash(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.R
 	}
 
 	key := string(cmd[1])
-	if !m.CheckTTL(key) {
-		return resp.MakeIntData(0)
-	}
 
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
