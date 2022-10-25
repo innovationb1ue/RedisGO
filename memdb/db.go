@@ -33,6 +33,11 @@ func NewMemDb() *MemDb {
 	}
 }
 
+type TTLInfo struct {
+	value  int64
+	cancel chan struct{}
+}
+
 func (m *MemDb) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if len(cmd) == 0 {
 		return nil
@@ -58,9 +63,9 @@ func (m *MemDb) CheckTTL(key string) bool {
 	if !ok {
 		return true
 	}
-	ttlTime := ttl.(int64)
+	ttlTime := ttl.(*TTLInfo)
 	now := time.Now().Unix()
-	if ttlTime > now {
+	if ttlTime.value > now {
 		return true
 	}
 	// if it should expire
@@ -80,19 +85,44 @@ func (m *MemDb) SetTTL(key string, value int64) int {
 		logger.Debug("SetTTL: key not exist")
 		return 0
 	}
+	cancel := make(chan struct{})
+	// remove old TTL task if exist
+	ttlInfoTmp, ok := m.ttlKeys.Get(key)
+	if ok {
+		ttlInfo := ttlInfoTmp.(*TTLInfo)
+		close(ttlInfo.cancel)
+		m.ttlKeys.Delete(key)
+	}
 	// save TTL
-	m.ttlKeys.Set(key, value)
+	m.ttlKeys.Set(key, &TTLInfo{
+		value:  value,
+		cancel: cancel,
+	})
 	// start TTL check timed task
 	go func() {
+		select {
 		// this chan fires after the ttl expire
-		<-time.After(time.Duration(value-time.Now().Unix()) * time.Second)
-		// CheckTTL locks itself
-		m.CheckTTL(key)
-		log.Println("TLL fires")
+		case <-time.After(time.Duration(value-time.Now().Unix()) * time.Second):
+			// CheckTTL locks itself
+			m.CheckTTL(key)
+			log.Println("TLL fires")
+		case <-cancel:
+			log.Println("TTL canceled")
+			return
+		}
 	}()
 	return 1
 }
 
 func (m *MemDb) DelTTL(key string) int {
+	// check ttl exist
+	ttlTmp, ok := m.ttlKeys.Get(key)
+	if !ok {
+		return 0
+	}
+	// cancel timed TTL task
+	ttl := ttlTmp.(*TTLInfo)
+	close(ttl.cancel)
+	// delete TTL key from cMap
 	return m.ttlKeys.Delete(key)
 }
