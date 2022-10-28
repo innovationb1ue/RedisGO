@@ -33,18 +33,16 @@ func NewManager(cfg *config.Config) *Manager {
 }
 
 // Handle distributes all the client command to execute
-func (m *Manager) Handle(conn net.Conn, close <-chan struct{}) {
-	ctx, cancel := context.WithCancel(context.Background())
+func (m *Manager) Handle(ctx context.Context, conn net.Conn) {
 	// gracefully close the tcp connection to client
 	defer func() {
-		cancel()
 		err := conn.Close()
 		if err != nil {
 			logger.Error(err)
 		}
 	}()
 	// create a goroutine that reads from the client and pump data into ch
-	ch := resp.ParseStream(conn)
+	ch := resp.ParseStream(ctx, conn)
 	// parsedRes is a complete command read from client
 	for {
 		select {
@@ -88,8 +86,7 @@ func (m *Manager) Handle(conn net.Conn, close <-chan struct{}) {
 					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
 				}
 			}
-		case <-close:
-			_ = conn.Close()
+		case <-ctx.Done():
 			return
 		}
 	}

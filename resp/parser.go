@@ -2,6 +2,7 @@ package resp
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -27,9 +28,9 @@ type readState struct {
 	inArray   bool
 }
 
-func ParseStream(reader io.Reader) <-chan *ParsedRes {
+func ParseStream(ctx context.Context, reader io.Reader) <-chan *ParsedRes {
 	ch := make(chan *ParsedRes)
-	go parse(reader, ch)
+	go parse(ctx, reader, ch)
 	return ch
 }
 
@@ -69,7 +70,7 @@ func newParse(reader io.Reader, ch chan<- *ParsedRes) {
 	}
 }
 
-func parse(reader io.Reader, ch chan<- *ParsedRes) {
+func parse(ctx context.Context, reader io.Reader, ch chan<- *ParsedRes) {
 	bufReader := bufio.NewReaderSize(reader, 4096) // 4096 is the default bufio buffer size, might change to a smaller number by configuration
 	state := new(readState)
 	for {
@@ -89,6 +90,11 @@ func parse(reader io.Reader, ch chan<- *ParsedRes) {
 				close(ch)
 				return
 			} else {
+				// server side shut down
+				if ctx.Err() != nil {
+					close(ch)
+					return
+				}
 				// Protocol error
 				logger.Error(err)
 				ch <- &ParsedRes{

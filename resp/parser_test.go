@@ -3,6 +3,7 @@ package resp
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -153,10 +154,12 @@ func TestParseStream(t *testing.T) {
 	var data []byte
 	var reader io.Reader
 	var ch <-chan *ParsedRes
+	var ctx context.Context
+	ctx = context.Background()
 	// test 1: Null elements in Arrays
 	data = []byte("*3\r\n$5\r\nhello\r\n$-1\r\n$5\r\nworld\r\n")
 	reader = bytes.NewReader(data)
-	ch = ParseStream(reader)
+	ch = ParseStream(ctx, reader)
 	for parseRes := range ch {
 		if parseRes.Err != nil {
 			if parseRes.Err != io.EOF {
@@ -186,7 +189,7 @@ func TestParseStream(t *testing.T) {
 	// test 2: null array
 	data = []byte("*-1\r\n")
 	reader = bytes.NewReader(data)
-	ch = ParseStream(reader)
+	ch = ParseStream(ctx, reader)
 	for parseRes := range ch {
 		if parseRes.Err != nil {
 			if parseRes.Err != io.EOF {
@@ -204,7 +207,7 @@ func TestParseStream(t *testing.T) {
 	//test 3: zero array
 	data = []byte("*0\r\n")
 	reader = bytes.NewReader(data)
-	ch = ParseStream(reader)
+	ch = ParseStream(ctx, reader)
 	for parseRes := range ch {
 		if parseRes.Err != nil {
 			if parseRes.Err != io.EOF {
@@ -222,7 +225,7 @@ func TestParseStream(t *testing.T) {
 	// test 4: nested array
 	data = []byte("*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Hello\r\n-World\r\n")
 	reader = bytes.NewReader(data)
-	ch = ParseStream(reader)
+	ch = ParseStream(ctx, reader)
 	k := 0
 	for parseRes := range ch {
 		if parseRes.Err != nil {
@@ -264,7 +267,7 @@ func TestParseStream(t *testing.T) {
 	// test 5: bulk strings
 	data = []byte("$5\r\nhello\r\n$-1\r\n$5\r\nworld\r\n")
 	reader = bytes.NewReader(data)
-	ch = ParseStream(reader)
+	ch = ParseStream(ctx, reader)
 	k = 0
 	for parseRes := range ch {
 		if parseRes.Err != nil {

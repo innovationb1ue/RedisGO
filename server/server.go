@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"context"
 	"net"
 	"os"
 	"os/signal"
@@ -15,29 +15,29 @@ import (
 
 // Start starts a simple redis server
 func Start(cfg *config.Config) error {
-	clientClose := make([]chan struct{}, 0)
 	// open tcp port
 	listener, err := net.Listen("tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
 	if err != nil {
 		logger.Panic(err)
 		return err
 	}
+	var isTerminating bool
 	// create client disconnect wait group
 	wg := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
 	// shutting down everything
 	defer func() {
-		log.Println("shutting down gracefully")
-		// 1. close tcp port
+		logger.Info("shutting down gracefully")
+		// 1. close listening tcp port
 		err := listener.Close()
 		if err != nil {
 			logger.Error(err)
 		}
-		// 2. send close to clients
-		for _, c := range clientClose {
-			close(c)
-		}
+		// 2. shut down client goroutines (send disconnect msg)
+		cancel()
 		// 3. wait for all clients to disconnect
 		wg.Wait()
+		logger.Info("See you again. ")
 	}()
 
 	logger.Info("Server Listen at ", cfg.Host, ":", cfg.Port)
@@ -52,8 +52,13 @@ func Start(cfg *config.Config) error {
 	go func() {
 		for {
 			conn, err := listener.Accept()
+			if isTerminating {
+				close(clients)
+				return
+			}
 			if err != nil {
 				logger.Error(err)
+				return
 			}
 			clients <- conn
 		}
@@ -62,21 +67,25 @@ func Start(cfg *config.Config) error {
 	for {
 		select {
 		// spawn a goroutine to handle client commands
-		case conn := <-clients:
+		case conn, ok := <-clients:
+			if !ok {
+				return nil
+			}
 			logger.Info(conn.RemoteAddr().String(), " connected")
-			closeChan := make(chan struct{})
-			clientClose = append(clientClose, closeChan)
 			// start the worker goroutine
 			go func() {
 				defer wg.Done()
-				mgr.Handle(conn, closeChan)
+				mgr.Handle(ctx, conn)
 			}()
 			wg.Add(1)
 		// exit server
 		case sig := <-sigs:
 			if sig == syscall.SIGTERM || sig == syscall.SIGINT {
+				logger.Info("Terminate")
+				isTerminating = true
 				return nil
 			}
 		}
 	}
+
 }
