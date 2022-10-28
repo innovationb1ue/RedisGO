@@ -21,7 +21,7 @@ var (
 	defaultLogLevel       = "info"
 	defaultShardNum       = 1024
 	defaultChanBufferSize = 10
-	configFile            = "./config/test.conf"
+	configFile            = "./redis.conf"
 )
 
 type Config struct {

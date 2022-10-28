@@ -7,7 +7,7 @@ import (
 
 func TestConfig_Parse(t *testing.T) {
 	cfg := new(Config)
-	err := cfg.Parse("./test.conf")
+	err := cfg.Parse("./RedisGO.conf")
 	if err != nil {
 		t.Error(err)
 	}
