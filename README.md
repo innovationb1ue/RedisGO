@@ -15,10 +15,12 @@ Code base adapted from this version
 ## Features
 
 * Support all Clients based on RESP protocol
-* Support String, List, Set, Hash data types
+* Support String, List, Set, SortedSet, Hash data types
+* Use AVL tree on Sorted Set (not skip list)
 * Support TTL(Key-Value pair will be deleted after TTL)
+* Dedicate memory usage. (C-Redis is not able to release any allocated memory, but we can!)
 * Full in-memory storage
-* Support atomic operation for some needed commands(like INCR, DECR, INCRBY, MSET, SMOVE, etc.)
+* Concurrent safe. 
 
 ## Usage
 Build RedisGO from source code:
@@ -28,7 +30,7 @@ $ go build -o RedisGO main.go
 Start RedisGO server:
 ```bash
 $ ./RedisGO
-[info][server.go:26] 2022/09/08 13:23:50 [Server Listen at  127.0.0.1 : 6379]
+[info][server.go:26] 2022/09/08 13:23:50 [Server Listen at  127.0.0.1 : 6380]
 ```
 Use start option commands or config file to change default settings:
 ```bash 
