@@ -76,5 +76,4 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 
 func RegisterStreamCommands() {
 	RegisterCommand("xadd", xadd)
-
 }
