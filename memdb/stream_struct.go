@@ -22,6 +22,7 @@ func NewStream() *Stream {
 	return &Stream{
 		entry:      make(map[string][]string),
 		timeStamps: make([]*StreamID, 0),
+		lock:       sync.RWMutex{},
 	}
 }
 
@@ -50,4 +51,24 @@ func (s *Stream) AddEntry(timeStamp int64, seqNum int64, val []string) error {
 	})
 	s.entry[idStr] = val
 	return nil
+}
+
+func (s *Stream) Range(start *StreamID, end *StreamID) ([]*StreamID, [][]string) {
+	if len(s.timeStamps) == 0 {
+		return nil, nil
+	}
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	var msgs = make([][]string, 0, len(s.entry))
+	if start.time == -1 && start.seqNum == -1 && end.seqNum == -1 && end.time == -1 {
+		for _, k := range s.timeStamps {
+			msgs = append(msgs, s.entry[fmt.Sprintf("%d-%d", k.time, k.seqNum)])
+		}
+		return s.timeStamps, msgs
+	}
+	return nil, nil
+}
+
+func (i *StreamID) Format() string {
+	return fmt.Sprintf("%d-%d", i.time, i.seqNum)
 }

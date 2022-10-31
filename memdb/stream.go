@@ -3,6 +3,7 @@ package memdb
 import (
 	"context"
 	"github.com/innovationb1ue/RedisGO/resp"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -101,11 +102,11 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 	for _, i := range kvPairsBytes {
 		kvPairs = append(kvPairs, string(i))
 	}
+	log.Println("Got value pairs ", kvPairs)
 
 	var tmp any
 	var ok bool
 	// key doesn't exist
-
 	if tmp, ok = m.db.Get(key); !ok {
 		stream := NewStream()
 		if autoID {
@@ -142,11 +143,60 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 	if limit {
 	}
 	println(threshold, count)
-
 	return resp.MakeArrayData([]resp.RedisData{})
+}
 
+func xrange(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisData {
+	if len(cmd) < 4 {
+		return resp.MakeWrongNumberArgs("xrange")
+	}
+	key := string(cmd[1])
+	var start, end *StreamID
+	if string(cmd[2]) == "-" {
+		start = &StreamID{
+			time:   -1,
+			seqNum: -1,
+		}
+	}
+	if string(cmd[3]) == "+" {
+		end = &StreamID{
+			time:   -1,
+			seqNum: -1,
+		}
+	}
+	m.locks.Lock(key)
+	defer m.locks.UnLock(key)
+	var stream *Stream
+	tmp, ok := m.db.Get(key)
+	// key doesn't exist
+	if !ok {
+		stream = NewStream()
+		m.db.Set(key, stream)
+	} else {
+		// key exist, assert it is a stream
+		stream, ok = tmp.(*Stream)
+		if !ok {
+			return resp.MakeWrongType()
+		}
+	}
+	ids, entries := stream.Range(start, end)
+	if ids != nil && entries != nil && len(ids) == len(entries) {
+		res := make([]resp.RedisData, 0, len(ids))
+		for i := 1; i < len(ids); i++ {
+			idData := resp.MakeStringData(ids[i].Format())
+			entriesData := make([]resp.RedisData, 0, len(entries[i]))
+			for _, val := range entries[i] {
+				entriesData = append(entriesData, resp.MakeStringData(val))
+			}
+			entriesArr := resp.MakeArrayData(entriesData)
+			res = append(res, resp.MakeArrayData([]resp.RedisData{idData, entriesArr}))
+		}
+		return resp.MakeArrayData(res)
+	}
+	return nil
 }
 
 func RegisterStreamCommands() {
 	RegisterCommand("xadd", xadd)
+	RegisterCommand("xrange", xrange)
 }
