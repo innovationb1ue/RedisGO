@@ -2,25 +2,31 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/innovationb1ue/RedisGO/blob/main/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/innovationb1ue/RedisGO)](https://goreportcard.com/report/github.com/innovationb1ue/RedisGO)  
-**RedisGO** is a high performance standalone cache server written by GO.  
+**RedisGO** is a high-performance standalone cache server written by GO. It reaches peak performance for the original C-Redis  
 It implemented full [RESP](https://redis.io/docs/reference/protocol-spec/)(Redis Serialization Protocol), so it supports
 all Redis clients.
 
-
 ## Base Works
-Code base adapted from this version
+The codebase is adapted from this version of
 [thinredis](https://github.com/VincentFF/thinredis/tree/86fa648426da7e9c3ff4c04aef1e43f1fdc7b1ac)
 
 
 ## Features
 
 * Support all Clients based on RESP protocol
-* Support String, List, Set, SortedSet, Hash data types
+* Support String, List, Set, SortedSet, and Hash data types
 * Use AVL tree on Sorted Set (not skip list)
 * Support TTL(Key-Value pair will be deleted after TTL)
 * Dedicate memory usage. (C-Redis is not able to release any allocated memory, but we can!)
 * Full in-memory storage
 * Concurrent safe. 
+
+## TODO
++ [x] Stream support
++ [ ] RDB persistence
++ [ ] AOF persistence
++ [ ] Cluster Mode
++ [ ] Master-Slave
 
 ## Usage
 Build RedisGO from source code:
@@ -91,12 +97,11 @@ list
 
 ## Benchmark
 
-
 Benchmark result is based on [redis-benchmark](https://redis.io/topics/benchmarks) tool.  
 Testing on MacBook Pro 2021 with M1 pro, 16.0 GB RAM, and on macOS Monterey.
 
-The first one is RedisGO result and the second is from Redis.  
-Note that this result could vary tremendously. Generally we say we reach 80-90% of the original C Redis performance. 
+The first one is the RedisGO result and the second is from Redis.  
+Note that this result could vary tremendously. Generally, we say we reach 80-90% of the original C Redis performance. 
 `benchmark -c 50 -n 200000 -t [get|set|...] -q`
 
 ```text
@@ -130,7 +135,7 @@ zrange a 0 100 withscores: 165016.50 requests per second, p50=0.175 msec
 ```
 
 ## Support Commands
-All commands used as [redis commands](https://redis.io/commands/). You can use any redis client to communicate with RedisGO.
+All commands are used as [redis commands](https://redis.io/commands/). You can use any Redis client to communicate with RedisGO.
 
 
 
@@ -157,5 +162,5 @@ All commands used as [redis commands](https://redis.io/commands/). You can use a
 
 #### PS:
 * **Lexicographical ranges**(BYLEX) in ZRANGE should never be used since it is barely useful and too complex to implement.
-you can easily sort your result in lexicographical order in your code and please don't let Redis do it for you. This option also implicitly assume all members have the same score, which might be misleading and confusing. 
+you can easily sort your result in lexicographical order in your code and please don't let Redis do it for you. This option also implicitly assumes all members have the same score, which might be misleading and confusing. 
 If members have different scores the reply will be unspecified. 
