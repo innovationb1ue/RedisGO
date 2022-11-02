@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 )
 
 type StreamID struct {
@@ -27,48 +28,101 @@ func NewStream() *Stream {
 }
 
 // AddEntry perform O(1) inserting
-func (s *Stream) AddEntry(timeStamp int64, seqNum int64, val []string) error {
+func (s *Stream) AddEntry(ID *StreamID, val []string) error {
+	// auto determine timestamp if necessary
+	if ID.time == -1 {
+		ID.time = time.Now().UnixMilli()
+	}
+	// lock map
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	// first entry
 	if len(s.timeStamps) == 0 {
-		idStr := fmt.Sprintf("%d-%d", timeStamp, seqNum)
-		s.timeStamps = append(s.timeStamps, &StreamID{
-			time:   timeStamp,
-			seqNum: seqNum,
-		})
-		s.entry[idStr] = val
+		ID.seqNum = 0
+		s.timeStamps = append(s.timeStamps, ID)
+		s.entry[ID.Format()] = val
 		return nil
 	}
 	// check top
 	top := s.timeStamps[len(s.timeStamps)-1]
-	if timeStamp < top.time || (timeStamp == top.time && top.seqNum >= seqNum) {
+	if ID.time < top.time || (ID.time == top.time && top.seqNum >= ID.seqNum) {
 		return errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
 	}
-	// same time stamp but larger sequence number or larger time stamp
-	idStr := fmt.Sprintf("%d-%d", timeStamp, seqNum)
-	s.timeStamps = append(s.timeStamps, &StreamID{
-		time:   timeStamp,
-		seqNum: seqNum,
-	})
-	s.entry[idStr] = val
+	// larger ID
+	if ID.time == top.time {
+		ID.seqNum = top.seqNum + 1
+	} else {
+		ID.seqNum = 0
+	}
+	s.timeStamps = append(s.timeStamps, ID)
+	s.entry[ID.Format()] = val
 	return nil
 }
 
+// Range go over a specific interval of stream IDs and return all the entries with that range.
+// use -1 for range to infinity
+// Return: ID structures, slice of key-value pairs of each entry(2d slice)
 func (s *Stream) Range(start *StreamID, end *StreamID) ([]*StreamID, [][]string) {
 	if len(s.timeStamps) == 0 {
 		return nil, nil
 	}
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	var msgs = make([][]string, 0, len(s.entry))
-	if start.time == -1 && start.seqNum == -1 && end.seqNum == -1 && end.time == -1 {
+	var msgs = make([][]string, 0)
+	var IDs = make([]*StreamID, 0)
+	// infinity case
+	if start.time == -1 && end.time == -1 {
 		for _, k := range s.timeStamps {
 			msgs = append(msgs, s.entry[fmt.Sprintf("%d-%d", k.time, k.seqNum)])
+			IDs = append(IDs, k)
 		}
 		return s.timeStamps, msgs
 	}
 	return nil, nil
 }
 
+func (s *Stream) DropFirst() int {
+	if len(s.timeStamps) == 0 {
+		return 0
+	}
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	stamp := s.timeStamps[0]
+	s.timeStamps = s.timeStamps[1:]
+	delete(s.entry, stamp.Format())
+	return len(s.timeStamps)
+}
+
+func (s *Stream) DropFirstN(n int) int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	length := len(s.timeStamps)
+	if n == 0 {
+		return len(s.timeStamps)
+	}
+	// drop all
+	if n >= length {
+		s.entry = make(map[string][]string)
+		s.timeStamps = make([]*StreamID, 0)
+		return 0
+	}
+	// drop partially
+	for _, t := range s.timeStamps[:n] {
+		delete(s.entry, t.Format())
+	}
+	s.timeStamps = s.timeStamps[n:]
+	return len(s.timeStamps)
+
+}
+
+// StreamID methods
+// *****************
+
+// Format return the string representation of a standard stream entry ID like "1667271690022-1"
 func (i *StreamID) Format() string {
 	return fmt.Sprintf("%d-%d", i.time, i.seqNum)
+}
+
+func (i *StreamID) GreaterEqual(ID *StreamID) bool {
+	return i.time >= ID.time && i.seqNum >= ID.seqNum
 }

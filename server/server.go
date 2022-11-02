@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -39,7 +40,8 @@ func Start(cfg *config.Config) error {
 		wg.Wait()
 		logger.Info("See you again. ")
 	}()
-
+	// welcome text
+	fmt.Println("\n██████╗░███████╗██████╗░██╗░██████╗░██████╗░░█████╗░\n██╔══██╗██╔════╝██╔══██╗██║██╔════╝██╔════╝░██╔══██╗\n██████╔╝█████╗░░██║░░██║██║╚█████╗░██║░░██╗░██║░░██║\n██╔══██╗██╔══╝░░██║░░██║██║░╚═══██╗██║░░╚██╗██║░░██║\n██║░░██║███████╗██████╔╝██║██████╔╝╚██████╔╝╚█████╔╝\n╚═╝░░╚═╝╚══════╝╚═════╝░╚═╝╚═════╝░░╚═════╝░░╚════╝░")
 	logger.Info("Server Listen at ", cfg.Host, ":", cfg.Port)
 	// handle termination
 	sigs := make(chan os.Signal, 1)
