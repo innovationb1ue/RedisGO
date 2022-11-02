@@ -93,7 +93,36 @@ func (s *Stream) DropFirst() int {
 	return len(s.timeStamps)
 }
 
+func (s *Stream) DropFirstN(n int) int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	length := len(s.timeStamps)
+	if n == 0 {
+		return len(s.timeStamps)
+	}
+	// drop all
+	if n >= length {
+		s.entry = make(map[string][]string)
+		s.timeStamps = make([]*StreamID, 0)
+		return 0
+	}
+	// drop partially
+	for _, t := range s.timeStamps[:n] {
+		delete(s.entry, t.Format())
+	}
+	s.timeStamps = s.timeStamps[n:]
+	return len(s.timeStamps)
+
+}
+
+// StreamID methods
+// *****************
+
 // Format return the string representation of a standard stream entry ID like "1667271690022-1"
 func (i *StreamID) Format() string {
 	return fmt.Sprintf("%d-%d", i.time, i.seqNum)
+}
+
+func (i *StreamID) GreaterEqual(ID *StreamID) bool {
+	return i.time >= ID.time && i.seqNum >= ID.seqNum
 }

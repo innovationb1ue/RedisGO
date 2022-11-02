@@ -15,8 +15,8 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 	// parse args
 	var key = string(cmd[1])
 	var idx = 2
-	var nomkstream, maxlen, minid, equal, wave, limit bool
-	var threshold, count int
+	var nomkstream, maxlen, minid, wave, limit bool
+	var threshold int
 	var IDThreshold = &StreamID{
 		time:   -1,
 		seqNum: -1,
@@ -38,10 +38,8 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 			idx++
 			// parse = (exact trim) or ~ (approximately trim)
 			if string(cmd[idx]) == "~" {
-				wave = true
 				idx++
 			} else if string(cmd[idx]) == "=" {
-				equal = true
 				idx++
 			}
 			// parse a following integer
@@ -57,6 +55,11 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 			minid = true
 			idx++
 			idStr := string(cmd[idx])
+			// optional = or ~ following minid
+			if idStr == "=" || idStr == "~" {
+				idx++
+				idStr = string(cmd[idx])
+			}
 			// complete ID
 			if strings.Contains(idStr, "-") {
 				trunks := strings.Split(idStr, "-")
@@ -84,10 +87,13 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 		case "limit":
 			limit = true
 			idx++
-			count, err = strconv.Atoi(string(cmd[idx]))
+			_, err = strconv.Atoi(string(cmd[idx]))
 			if err != nil {
 				return resp.MakeErrorData("ERR value is not an integer or out of range")
 			}
+			idx++
+		case "~":
+			wave = true
 		default:
 			// parse ID or determine auto ID here
 			if string(cmd[idx]) != "*" {
@@ -119,6 +125,9 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 	if maxlen && minid {
 		return resp.MakeErrorData("ERR syntax error, MAXLEN and MINID options at the same time are not compatible")
 	}
+	if limit && !wave {
+		return resp.MakeErrorData("ERR syntax error, LIMIT cannot be used without the special ~ option")
+	}
 	// lock the key
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
@@ -127,6 +136,10 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 	var kvPairs = make([]string, 0, len(kvPairsBytes))
 	for _, i := range kvPairsBytes {
 		kvPairs = append(kvPairs, string(i))
+	}
+	// broken pairs
+	if len(kvPairs)%2 != 0 {
+		return resp.MakeWrongNumberArgs("xadd")
 	}
 
 	var tmp any
@@ -157,19 +170,25 @@ func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisDat
 	}
 	// need to perform xtrim
 	if maxlen && len(stream.timeStamps) > threshold {
-		for len(stream.timeStamps) > threshold {
-			stream.DropFirst()
-		}
+		stream.DropFirstN(len(stream.timeStamps) - threshold)
 	}
 	if minid {
-	}
-	if equal {
+		// perform a trim. Drop first N earlier entries
+		// O(n) linear search. Could be optimized later
+		// todo: optimize this search
+		count := 0
+		for _, id := range stream.timeStamps {
+			if id.GreaterEqual(ID) {
+				stream.DropFirstN(count)
+			} else {
+				count++
+			}
+		}
 	}
 	if wave {
+		// nearly exact trimming is not useful in our implement.
+		// We will always perform a exact trim now.
 	}
-	if limit {
-	}
-	println(threshold, count)
 	return resp.MakeBulkData(resp.MakeStringData(ID.Format()).ByteData())
 }
 
