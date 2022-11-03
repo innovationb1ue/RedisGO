@@ -25,7 +25,7 @@ The codebase is adapted from this version of
 + [x] Stream support
 + [ ] RDB persistence
 + [ ] AOF persistence
-+ [ ] Cluster Mode
++ [ ] Cluster Mode(with [Raft Algorithm](https://raft.github.io/) and higher level of write safety than C-Redis)
 + [ ] Master-Slave
 
 ## Usage
