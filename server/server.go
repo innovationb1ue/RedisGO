@@ -89,5 +89,41 @@ func Start(cfg *config.Config) error {
 			}
 		}
 	}
+}
 
+func StartCluster(cfg *config.Config) error {
+	// open tcp port
+	listener, err := net.Listen("tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
+	if err != nil {
+		logger.Panic(err)
+		return err
+	}
+	var isTerminating bool
+	// create client disconnect wait group
+	wg := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+	// shutting down everything
+	defer func() {
+		logger.Info("shutting down gracefully")
+		// 1. close listening tcp port
+		err := listener.Close()
+		if err != nil {
+			logger.Error(err)
+		}
+		// 2. shut down client goroutines (send disconnect msg)
+		cancel()
+		// 3. wait for all clients to disconnect
+		wg.Wait()
+		logger.Info("See you again. ")
+	}()
+	// welcome text
+	fmt.Println("\n██████╗░███████╗██████╗░██╗░██████╗░██████╗░░█████╗░\n██╔══██╗██╔════╝██╔══██╗██║██╔════╝██╔════╝░██╔══██╗\n██████╔╝█████╗░░██║░░██║██║╚█████╗░██║░░██╗░██║░░██║\n██╔══██╗██╔══╝░░██║░░██║██║░╚═══██╗██║░░╚██╗██║░░██║\n██║░░██║███████╗██████╔╝██║██████╔╝╚██████╔╝╚█████╔╝\n╚═╝░░╚═╝╚══════╝╚═════╝░╚═╝╚═════╝░░╚═════╝░░╚════╝░")
+	logger.Info("Server Listen at ", cfg.Host, ":", cfg.Port)
+	// handle termination
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
+	// client chan
+	clients := make(chan net.Conn)
+	// create n db for SELECT cmd
+	mgr := NewManager(cfg)
 }

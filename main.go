@@ -23,16 +23,19 @@ func init() {
 }
 
 func main() {
+	// setup config
 	cfg, err := config.Setup()
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+	// setup logger
 	err = logger.SetUp(cfg)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	// setup tcp server
 	err = server.Start(cfg)
 	if err != nil {
 		os.Exit(1)
