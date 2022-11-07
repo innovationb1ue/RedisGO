@@ -212,5 +212,7 @@ func (cfg *Config) ParseConfigJson(path string) error {
 	if err != nil {
 		return errors.New("Invalid config file fields. ")
 	}
+	// we only support a single database in cluster mode
+	cfg.Databases = 1
 	return nil
 }
