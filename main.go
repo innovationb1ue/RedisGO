@@ -35,12 +35,6 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if cfg.IsCluster {
-		err = server.Start(cfg)
-		if err != nil {
-			os.Exit(1)
-		}
-	}
 	// setup tcp server
 	err = server.Start(cfg)
 	if err != nil {

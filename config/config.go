@@ -39,6 +39,7 @@ type Config struct {
 	ClusterConfigPath string
 	IsCluster         bool   `json:"IsCluster"`
 	PeerAddrs         string `json:"PeerAddrs"`
+	PeerIDs           string `json:"PeerIDs"`
 	RaftAddr          string `json:"RaftAddr"`
 	NodeID            int    `json:"NodeID"`
 	KVPort            int    `json:"KVPort"`
@@ -64,7 +65,7 @@ func flagInit(cfg *Config) {
 	flag.StringVar(&cfg.ClusterConfigPath, "ClusterConfigPath", "./cluster_config.json", "config file to start cluster mode")
 	flag.BoolVar(&cfg.IsCluster, "IsCluster", false, "flag indicates running in cluster mode")
 	flag.StringVar(&cfg.PeerAddrs, "PeerAddrs", "http://127.0.0.1:16380", "comma separated cluster peers")
-	flag.IntVar(&cfg.NodeID, "NodeID", 1, "node ID")
+	flag.IntVar(&cfg.NodeID, "NodeID", -1, "node ID")
 	flag.IntVar(&cfg.KVPort, "KVPort", 6380, "key-value server port")
 	flag.BoolVar(&cfg.JoinCluster, "Join", false, "join an existing cluster")
 }
@@ -73,21 +74,22 @@ func flagInit(cfg *Config) {
 // Return configured Config pointer and error.
 func Setup() (*Config, error) {
 	cfg := &Config{
-		ConfFile:       configFile,
-		Host:           defaultHost,
-		Port:           defaultPort,
-		LogDir:         defaultLogDir,
-		LogLevel:       defaultLogLevel,
-		ShardNum:       defaultShardNum,
-		ChanBufferSize: defaultChanBufferSize,
-		Databases:      16,
-		Others:         make(map[string]any),
-		IsCluster:      false,
-		PeerAddrs:      "",
-		RaftAddr:       "",
-		NodeID:         0,
-		KVPort:         0,
-		JoinCluster:    false,
+		ConfFile:          configFile,
+		Host:              defaultHost,
+		Port:              defaultPort,
+		LogDir:            defaultLogDir,
+		LogLevel:          defaultLogLevel,
+		ShardNum:          defaultShardNum,
+		ChanBufferSize:    defaultChanBufferSize,
+		Databases:         16,
+		Others:            make(map[string]any),
+		ClusterConfigPath: "",
+		IsCluster:         false,
+		PeerAddrs:         "",
+		RaftAddr:          "",
+		NodeID:            -1,
+		KVPort:            0,
+		JoinCluster:       false,
 	}
 	flagInit(cfg)
 	// parse command line flags
@@ -116,7 +118,7 @@ func Setup() (*Config, error) {
 		if cfg.ClusterConfigPath == "" {
 			return nil, errors.New("cluster mode need a cluster config file to start. ")
 		}
-		err := cfg.ParseConfigJson("./cluster_config.json")
+		err := cfg.ParseConfigJson(cfg.ClusterConfigPath)
 		if err != nil {
 			return nil, err
 		}
@@ -209,9 +211,14 @@ func (cfg *Config) ParseConfigJson(path string) error {
 		return errors.New("json config not exist")
 	}
 	err = json.Unmarshal(data, cfg)
+	if cfg.NodeID <= 0 {
+		panic("NodeID not set")
+	}
 	if err != nil {
 		return errors.New("Invalid config file fields. ")
 	}
+	cfg.RaftAddr = strings.Split(cfg.PeerAddrs, ",")[cfg.NodeID-1]
+	log.Println("RaftAddr = ", cfg.RaftAddr)
 	// we only support a single database in cluster mode
 	cfg.Databases = 1
 	return nil
