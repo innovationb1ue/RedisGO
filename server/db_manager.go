@@ -20,6 +20,10 @@ type Manager struct {
 	DBs   []*memdb.MemDb
 }
 
+type MemStorageStats struct {
+	initialState, firstIndex, lastIndex, entries, term, snapshot int
+}
+
 // NewManager creates a default Manager
 func NewManager(cfg *config.Config) *Manager {
 	DBs := make([]*memdb.MemDb, cfg.Databases)
@@ -69,7 +73,7 @@ func (m *Manager) Handle(ctx context.Context, conn net.Conn) {
 			}
 			// extract [][]bytes command
 			cmd := arrayData.ToCommand()
-			// run the string command
+			// run the string command when in standalone mode
 			// also pass connection as an argument since the command may block and return continuous messages
 			res := m.ExecCommand(ctx, cmd, conn)
 			// return result
@@ -126,4 +130,50 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	}
 	m.memDb = m.DBs[dbIdx]
 	return resp.MakeStringData("OK")
+}
+
+func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan<- string) {
+	// gracefully close the tcp connection to client
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			logger.Error(err)
+		}
+	}()
+	// create a goroutine that reads from the client and pump data into ch
+	ch := resp.ParseStream(ctx, conn)
+	// parsedRes is a complete command read from client
+	for {
+		select {
+		case parsedRes := <-ch:
+			// handle errors
+			if parsedRes.Err != nil {
+				if parsedRes.Err == io.EOF {
+					logger.Info("Close connection ", conn.RemoteAddr().String())
+				} else {
+					logger.Panic("Handle connection ", conn.RemoteAddr().String(), " panic: ", parsedRes.Err.Error())
+				}
+				return
+			}
+			// empty msg
+			if parsedRes.Data == nil {
+				logger.Error("empty parsedRes.Data from ", conn.RemoteAddr().String())
+				continue
+			}
+			// handling array command
+			arrayData, ok := parsedRes.Data.(*resp.ArrayData)
+			if !ok {
+				logger.Error("parsedRes.Data is not ArrayData from ", conn.RemoteAddr().String())
+				continue
+			}
+			// extract [][]bytes command
+			cmdStrings := arrayData.ToStringCommand()
+			// propose command to raft cluster
+			propose <- strings.Join(cmdStrings, " ")
+			conn.Write(resp.MakeStringData("OK").ToBytes())
+			// todo: fetch command state from leader and return response
+		case <-ctx.Done():
+			return
+		}
+	}
 }
