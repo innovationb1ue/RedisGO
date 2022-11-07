@@ -2,6 +2,8 @@ package config
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -25,15 +27,22 @@ var (
 )
 
 type Config struct {
-	ConfFile       string
-	Host           string
-	Port           int
-	LogDir         string
-	LogLevel       string
-	ShardNum       int
-	ChanBufferSize int
-	Databases      int
-	Others         map[string]any
+	ConfFile          string
+	Host              string
+	Port              int
+	LogDir            string
+	LogLevel          string
+	ShardNum          int
+	ChanBufferSize    int
+	Databases         int
+	Others            map[string]any
+	ClusterConfigPath string
+	IsCluster         bool   `json:"IsCluster"`
+	PeerAddrs         string `json:"PeerAddrs"`
+	RaftAddr          string `json:"RaftAddr"`
+	NodeID            int    `json:"NodeID"`
+	KVPort            int    `json:"KVPort"`
+	JoinCluster       bool   `json:"JoinCluster"`
 }
 
 type CfgError struct {
@@ -51,6 +60,13 @@ func flagInit(cfg *Config) {
 	flag.StringVar(&(cfg.LogDir), "logdir", defaultLogDir, "Create log directory: default is /tmp")
 	flag.StringVar(&(cfg.LogLevel), "loglevel", defaultLogLevel, "Create log level: default is info")
 	flag.IntVar(&(cfg.ChanBufferSize), "chanBufSize", defaultChanBufferSize, "set the buffer size of channels in PUB/SUB commands. ")
+	// distribution flags
+	flag.StringVar(&cfg.ClusterConfigPath, "ClusterConfigPath", "./cluster_config.json", "config file to start cluster mode")
+	flag.BoolVar(&cfg.IsCluster, "IsCluster", false, "flag indicates running in cluster mode")
+	flag.StringVar(&cfg.PeerAddrs, "PeerAddrs", "http://127.0.0.1:16380", "comma separated cluster peers")
+	flag.IntVar(&cfg.NodeID, "NodeID", 1, "node ID")
+	flag.IntVar(&cfg.KVPort, "KVPort", 6380, "key-value server port")
+	flag.BoolVar(&cfg.JoinCluster, "Join", false, "join an existing cluster")
 }
 
 // Setup initialize configs and do some validation checking.
@@ -66,9 +82,17 @@ func Setup() (*Config, error) {
 		ChanBufferSize: defaultChanBufferSize,
 		Databases:      16,
 		Others:         make(map[string]any),
+		IsCluster:      false,
+		PeerAddrs:      "",
+		RaftAddr:       "",
+		NodeID:         0,
+		KVPort:         0,
+		JoinCluster:    false,
 	}
 	flagInit(cfg)
+	// parse command line flags
 	flag.Parse()
+	// parse config file & checks
 	if cfg.ConfFile != "" {
 		if err := cfg.Parse(cfg.ConfFile); err != nil {
 			return nil, err
@@ -85,6 +109,16 @@ func Setup() (*Config, error) {
 				message: fmt.Sprintf("Listening port should between 1024 and 65535, but %d is given.", cfg.Port),
 			}
 			return nil, portErr
+		}
+	}
+	// cluster mode
+	if cfg.IsCluster {
+		if cfg.ClusterConfigPath == "" {
+			return nil, errors.New("cluster mode need a cluster config file to start. ")
+		}
+		err := cfg.ParseConfigJson("./cluster_config.json")
+		if err != nil {
+			return nil, err
 		}
 	}
 	Configures = cfg
@@ -165,6 +199,18 @@ func (cfg *Config) Parse(cfgFile string) error {
 		if ioErr == io.EOF {
 			break
 		}
+	}
+	return nil
+}
+
+func (cfg *Config) ParseConfigJson(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return errors.New("json config not exist")
+	}
+	err = json.Unmarshal(data, cfg)
+	if err != nil {
+		return errors.New("Invalid config file fields. ")
 	}
 	return nil
 }
