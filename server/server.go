@@ -20,7 +20,7 @@ import (
 	"github.com/innovationb1ue/RedisGO/logger"
 )
 
-// Start starts a simple redis server
+// Start starts a simple redis server and raft layer if in cluster mode
 func Start(cfg *config.Config) error {
 	// open tcp port
 	listener, err := net.Listen("tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
@@ -232,7 +232,7 @@ func Start(cfg *config.Config) error {
 	}
 }
 
-func HandleRaftNode() {
+func HandleRaftNode(node raft.Node, proposeC chan string, confChangeC chan raftpb.ConfChange) {
 	// send proposals over raft
 	go func() {
 		confChangeCount := uint64(0)
