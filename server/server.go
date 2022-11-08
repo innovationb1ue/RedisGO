@@ -1,12 +1,13 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"go.etcd.io/etcd/raft/v3"
+	"github.com/innovationb1ue/RedisGO/config"
+	"github.com/innovationb1ue/RedisGO/logger"
+	"github.com/innovationb1ue/RedisGO/raftexample"
 	"go.etcd.io/etcd/raft/v3/raftpb"
-	"log"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
 	"net"
 	"os"
 	"os/signal"
@@ -14,10 +15,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
-
-	"github.com/innovationb1ue/RedisGO/config"
-	"github.com/innovationb1ue/RedisGO/logger"
 )
 
 // Start starts a simple redis server and raft layer if in cluster mode
@@ -57,135 +54,6 @@ func Start(cfg *config.Config) error {
 	// create n db for SELECT cmd
 	mgr := NewManager(cfg)
 
-	// cluster logic here *******************
-	// cluster channels. we initialize them anyway since they won't take much memory
-	proposeC := make(chan string, 5)
-	defer close(proposeC)
-	confChangeC := make(chan raftpb.ConfChange)
-	defer close(confChangeC)
-	storage := raft.NewMemoryStorage()
-	// node config
-	c := &raft.Config{
-		ID:              uint64(cfg.NodeID),
-		ElectionTick:    10,
-		HeartbeatTick:   1,
-		Storage:         storage,
-		MaxSizePerMsg:   4096,
-		MaxInflightMsgs: 256,
-	}
-	// single node cluster
-	var peers = make([]raft.Peer, 0)
-	PeerAddrs := strings.Split(cfg.PeerAddrs, ",")
-	PeerAddrs = append(PeerAddrs[:cfg.NodeID-1], PeerAddrs[cfg.NodeID:]...)
-	PeerIDs := strings.Split(cfg.PeerIDs, ",")
-	PeerIDs = append(PeerIDs[:cfg.NodeID-1], PeerIDs[cfg.NodeID:]...)
-	log.Println("PeerIDs=", PeerIDs)
-	for _, peerID := range PeerIDs {
-		id, err := strconv.Atoi(peerID)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-		peers = append(peers, raft.Peer{
-			ID:      uint64(id),
-			Context: nil,
-		})
-	}
-	if len(peers) == 0 {
-		peers = []raft.Peer{{ID: 0x01}}
-	}
-	var node raft.Node
-	node = raft.StartNode(c, peers)
-
-	c := &raft.Config{
-		ID:              0x01,
-		ElectionTick:    10,
-		HeartbeatTick:   1,
-		Storage:         raft.NewMemoryStorage(),
-		MaxSizePerMsg:   4096,
-		MaxInflightMsgs: 256,
-	}
-	// Set peer list to the other nodes in the cluster.
-	// Note that they need to be started separately as well.
-	n := raft.StartNode(c, []raft.Peer{{ID: 0x02}, {ID: 0x03}})
-
-	// timer used in event loop
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	// send proposals over raft
-	go func() {
-		confChangeCount := uint64(0)
-		for proposeC != nil && confChangeC != nil {
-			select {
-			case prop, ok := <-proposeC:
-				if !ok {
-					proposeC = nil
-				} else {
-					// blocks until accepted by raft state machine
-					node.Propose(context.TODO(), []byte(prop))
-				}
-
-			case cc, ok := <-confChangeC:
-				if !ok {
-					confChangeC = nil
-				} else {
-					confChangeCount++
-					cc.ID = confChangeCount
-					node.ProposeConfChange(context.TODO(), cc)
-				}
-			}
-		}
-	}()
-	// event loop on raft state machine updates
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				node.Tick()
-
-			// store raft entries to wal, then publish over commit channel
-			case rd := <-node.Ready():
-				// Must save the snapshot file and WAL snapshot entry before saving any other entries
-				// or hardstate to ensure that recovery after a snapshot restore is possible.
-				//if !raft.IsEmptySnap(rd.Snapshot) {
-				//	saveSnap(rd.Snapshot)
-				//}
-				//rc.wal.Save(rd.HardState, rd.Entries)
-				//if !raft.IsEmptySnap(rd.Snapshot) {
-				//	rc.raftStorage.ApplySnapshot(rd.Snapshot)
-				//	rc.publishSnapshot(rd.Snapshot)
-				//}
-				storage.Append(rd.Entries)
-
-				for _, entry := range rd.CommittedEntries {
-					// apply commited commands to state machine
-					data := mgr.ExecCommand(ctx, bytes.Split(entry.Data, []byte{' '}), nil)
-					log.Println(string(data.ByteData()))
-					if entry.Type == raftpb.EntryConfChange {
-						var cc raftpb.ConfChange
-						cc.Unmarshal(entry.Data)
-						node.ApplyConfChange(cc)
-					}
-				}
-
-				//rc.transport.Send(rc.processMessages(rd.Messages))
-				//applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries))
-				//if !ok {
-				//	rc.stop()
-				//	return
-				//}
-				//rc.maybeTriggerSnapshot(applyDoneC)
-				node.Advance()
-				//case err := <-rc.transport.ErrorC:
-				//	rc.writeError(err)
-				//	return
-				//
-				//case <-rc.stopc:
-				//	rc.stop()
-				//	return
-			}
-		}
-	}()
 	// spawn a worker to accept tcp connections & create client objects
 	go func() {
 		for {
@@ -201,6 +69,27 @@ func Start(cfg *config.Config) error {
 			clients <- conn
 		}
 	}()
+
+	// cluster logic here *******************
+	var proposeC chan string
+	var commitC <-chan *raftexample.RaftCommit
+	var errorC <-chan error
+	var snapshotterReady <-chan *snap.Snapshotter
+	var confChangeC chan raftpb.ConfChange
+	if cfg.IsCluster {
+		logger.Info("Initializing cluster node")
+		// send to proposeC to send message to raft cluster
+		proposeC = make(chan string, 5)
+		defer close(proposeC)
+		confChangeC = make(chan raftpb.ConfChange)
+		defer close(confChangeC)
+		// start raft node
+		getSnapshot := func() ([]byte, error) { return mgr.CurrentDB.GetSnapshot() }
+		// read from commitC to update state machine
+		commitC, errorC, snapshotterReady = raftexample.NewRaftNode(cfg.NodeID, strings.Split(cfg.PeerAddrs, ","), false, getSnapshot, proposeC, confChangeC)
+		<-snapshotterReady
+	}
+
 	// server event loop
 	for {
 		select {
@@ -215,7 +104,7 @@ func Start(cfg *config.Config) error {
 				defer wg.Done()
 				// decide the right handler to process command
 				if cfg.IsCluster {
-					mgr.HandleCluster(ctx, conn, proposeC)
+					mgr.HandleCluster(ctx, conn, proposeC, commitC)
 				} else {
 					mgr.Handle(ctx, conn)
 				}
@@ -228,87 +117,10 @@ func Start(cfg *config.Config) error {
 				isTerminating = true
 				return nil
 			}
+		// error in raft cluster
+		case <-errorC:
+			return nil
 		}
+
 	}
-}
-
-func HandleRaftNode(node raft.Node, proposeC chan string, confChangeC chan raftpb.ConfChange) {
-	// send proposals over raft
-	go func() {
-		confChangeCount := uint64(0)
-		for proposeC != nil && confChangeC != nil {
-			select {
-			case prop, ok := <-proposeC:
-				if !ok {
-					proposeC = nil
-				} else {
-					// blocks until accepted by raft state machine
-					node.Propose(context.TODO(), []byte(prop))
-				}
-
-			case cc, ok := <-confChangeC:
-				if !ok {
-					confChangeC = nil
-				} else {
-					confChangeCount++
-					cc.ID = confChangeCount
-					node.ProposeConfChange(context.TODO(), cc)
-				}
-			}
-		}
-	}()
-
-	// timer used in event loop
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	// event loop on raft state machine updates
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				node.Tick()
-
-			// store raft entries to wal, then publish over commit channel
-			case rd := <-node.Ready():
-				// Must save the snapshot file and WAL snapshot entry before saving any other entries
-				// or hardstate to ensure that recovery after a snapshot restore is possible.
-				//if !raft.IsEmptySnap(rd.Snapshot) {
-				//	saveSnap(rd.Snapshot)
-				//}
-				//rc.wal.Save(rd.HardState, rd.Entries)
-				//if !raft.IsEmptySnap(rd.Snapshot) {
-				//	rc.raftStorage.ApplySnapshot(rd.Snapshot)
-				//	rc.publishSnapshot(rd.Snapshot)
-				//}
-				storage.Append(rd.Entries)
-
-				for _, entry := range rd.CommittedEntries {
-					// apply commited commands to state machine
-					data := mgr.ExecCommand(ctx, bytes.Split(entry.Data, []byte{' '}), nil)
-					log.Println(string(data.ByteData()))
-					if entry.Type == raftpb.EntryConfChange {
-						var cc raftpb.ConfChange
-						cc.Unmarshal(entry.Data)
-						node.ApplyConfChange(cc)
-					}
-				}
-
-				//rc.transport.Send(rc.processMessages(rd.Messages))
-				//applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries))
-				//if !ok {
-				//	rc.stop()
-				//	return
-				//}
-				//rc.maybeTriggerSnapshot(applyDoneC)
-				node.Advance()
-				//case err := <-rc.transport.ErrorC:
-				//	rc.writeError(err)
-				//	return
-				//
-				//case <-rc.stopc:
-				//	rc.stop()
-				//	return
-			}
-		}
-	}()
 }

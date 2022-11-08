@@ -6,8 +6,10 @@ import (
 	"github.com/innovationb1ue/RedisGO/config"
 	"github.com/innovationb1ue/RedisGO/logger"
 	"github.com/innovationb1ue/RedisGO/memdb"
+	"github.com/innovationb1ue/RedisGO/raftexample"
 	"github.com/innovationb1ue/RedisGO/resp"
 	"io"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -16,8 +18,8 @@ import (
 // Manager handles all client requests to the server
 // It holds multiple MemDb instances
 type Manager struct {
-	memDb *memdb.MemDb
-	DBs   []*memdb.MemDb
+	CurrentDB *memdb.MemDb
+	DBs       []*memdb.MemDb
 }
 
 type MemStorageStats struct {
@@ -31,8 +33,8 @@ func NewManager(cfg *config.Config) *Manager {
 		DBs[i] = memdb.NewMemDb()
 	}
 	return &Manager{
-		memDb: DBs[0],
-		DBs:   DBs,
+		CurrentDB: DBs[0],
+		DBs:       DBs,
 	}
 }
 
@@ -112,7 +114,32 @@ func (m *Manager) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) 
 	if !ok {
 		res = resp.MakeErrorData("ERR unknown command ", cmdName)
 	} else {
-		res = command.Executor(ctx, m.memDb, cmd, conn)
+		res = command.Executor(ctx, m.CurrentDB, cmd, conn)
+	}
+	return res
+}
+
+func (m *Manager) ExecStrCommand(ctx context.Context, cmd []string, conn net.Conn) resp.RedisData {
+	if len(cmd) == 0 {
+		return nil
+	}
+	var res resp.RedisData
+	cmdName := strings.ToLower(cmd[0])
+	// global commands
+	byteCmd := make([][]byte, 0)
+	for _, s := range cmd {
+		byteCmd = append(byteCmd, []byte(s))
+	}
+	switch cmdName {
+	case "select":
+		return m.Select(byteCmd)
+	}
+	// get the command from hash table and execute it.
+	command, ok := memdb.CmdTable[cmdName]
+	if !ok {
+		res = resp.MakeErrorData("ERR unknown command ", cmdName)
+	} else {
+		res = command.Executor(ctx, m.CurrentDB, byteCmd, conn)
 	}
 	return res
 }
@@ -128,11 +155,11 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	if dbIdx >= len(m.DBs) || dbIdx < 0 {
 		return resp.MakeErrorData(fmt.Sprintf("ERR DB index is out of range with maximum %d", len(m.DBs)))
 	}
-	m.memDb = m.DBs[dbIdx]
+	m.CurrentDB = m.DBs[dbIdx]
 	return resp.MakeStringData("OK")
 }
 
-func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan<- string) {
+func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan<- string, commit <-chan *raftexample.RaftCommit) {
 	// gracefully close the tcp connection to client
 	defer func() {
 		err := conn.Close()
@@ -170,10 +197,13 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan
 			cmdStrings := arrayData.ToStringCommand()
 			// propose command to raft cluster
 			propose <- strings.Join(cmdStrings, " ")
-			conn.Write(resp.MakeStringData("OK").ToBytes())
 			// todo: fetch command state from leader and return response
+			conn.Write(resp.MakeStringData("OK").ToBytes())
 		case <-ctx.Done():
 			return
+		case msg := <-commit:
+			m.ExecStrCommand(ctx, msg.Data, conn)
+			log.Println("cluster commit: exec command ", msg.Data, "")
 		}
 	}
 }

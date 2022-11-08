@@ -126,3 +126,8 @@ func (m *MemDb) DelTTL(key string) int {
 	// delete TTL key from cMap
 	return m.ttlKeys.Delete(key)
 }
+
+func (m *MemDb) GetSnapshot() ([]byte, error) {
+	// todo: impl this or change the snapshot format to rdb|aof
+	return []byte{}, nil
+}

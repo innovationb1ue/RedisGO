@@ -126,6 +126,7 @@ func (m *ConcurrentMap) Clear() {
 	*m = *NewConcurrentMap(m.size)
 }
 
+// Keys return all stored keys in the concurrent map
 func (m *ConcurrentMap) Keys() []string {
 	keys := make([]string, m.count)
 	i := 0
