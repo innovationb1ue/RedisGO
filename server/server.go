@@ -8,6 +8,7 @@ import (
 	"github.com/innovationb1ue/RedisGO/raftexample"
 	"go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -79,7 +80,7 @@ func Start(cfg *config.Config) error {
 	if cfg.IsCluster {
 		logger.Info("Initializing cluster node")
 		// send to proposeC to send message to raft cluster
-		proposeC = make(chan string, 5)
+		proposeC = make(chan string)
 		defer close(proposeC)
 		confChangeC = make(chan raftpb.ConfChange)
 		defer close(confChangeC)
@@ -88,6 +89,23 @@ func Start(cfg *config.Config) error {
 		// read from commitC to update state machine
 		commitC, errorC, snapshotterReady = raftexample.NewRaftNode(cfg.NodeID, strings.Split(cfg.PeerAddrs, ","), false, getSnapshot, proposeC, confChangeC)
 		<-snapshotterReady
+
+		// handle cluster commits
+		go func() {
+			for msg := range commitC {
+				if msg == nil {
+					continue
+				}
+				for _, cmd := range msg.Data {
+					res := mgr.ExecStrCommand(ctx, cmd, nil)
+					log.Println("cluster commitC: exec command ", msg.Data, "result = ", res)
+				}
+				close(msg.ApplyDoneC)
+			}
+			if err, ok := <-errorC; ok {
+				log.Fatal(err)
+			}
+		}()
 	}
 
 	// server event loop
@@ -102,6 +120,7 @@ func Start(cfg *config.Config) error {
 			// start the worker goroutine
 			go func() {
 				defer wg.Done()
+				log.Println("start one worker")
 				// decide the right handler to process command
 				if cfg.IsCluster {
 					mgr.HandleCluster(ctx, conn, proposeC, commitC)

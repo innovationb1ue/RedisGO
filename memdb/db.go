@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net"
 	"strings"
@@ -129,5 +130,5 @@ func (m *MemDb) DelTTL(key string) int {
 
 func (m *MemDb) GetSnapshot() ([]byte, error) {
 	// todo: impl this or change the snapshot format to rdb|aof
-	return []byte{}, nil
+	return json.Marshal(map[string]string{"cmd1": "cmd1value"})
 }

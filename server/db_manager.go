@@ -9,7 +9,6 @@ import (
 	"github.com/innovationb1ue/RedisGO/raftexample"
 	"github.com/innovationb1ue/RedisGO/resp"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -119,7 +118,8 @@ func (m *Manager) ExecCommand(ctx context.Context, cmd [][]byte, conn net.Conn) 
 	return res
 }
 
-func (m *Manager) ExecStrCommand(ctx context.Context, cmd []string, conn net.Conn) resp.RedisData {
+func (m *Manager) ExecStrCommand(ctx context.Context, cmdStr string, conn net.Conn) resp.RedisData {
+	cmd := strings.Split(cmdStr, " ")
 	if len(cmd) == 0 {
 		return nil
 	}
@@ -159,7 +159,7 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan<- string, commit <-chan *raftexample.RaftCommit) {
+func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- string, commitC <-chan *raftexample.RaftCommit) {
 	// gracefully close the tcp connection to client
 	defer func() {
 		err := conn.Close()
@@ -169,6 +169,7 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan
 	}()
 	// create a goroutine that reads from the client and pump data into ch
 	ch := resp.ParseStream(ctx, conn)
+
 	// parsedRes is a complete command read from client
 	for {
 		select {
@@ -195,15 +196,12 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, propose chan
 			}
 			// extract [][]bytes command
 			cmdStrings := arrayData.ToStringCommand()
-			// propose command to raft cluster
-			propose <- strings.Join(cmdStrings, " ")
+			// proposeC command to raft cluster
+			proposeC <- strings.Join(cmdStrings, " ")
 			// todo: fetch command state from leader and return response
-			conn.Write(resp.MakeStringData("OK").ToBytes())
+			conn.Write(resp.MakeStringData("OK received " + strings.Join(cmdStrings, " ")).ToBytes())
 		case <-ctx.Done():
 			return
-		case msg := <-commit:
-			m.ExecStrCommand(ctx, msg.Data, conn)
-			log.Println("cluster commit: exec command ", msg.Data, "")
 		}
 	}
 }
