@@ -129,6 +129,6 @@ func (m *MemDb) DelTTL(key string) int {
 }
 
 func (m *MemDb) GetSnapshot() ([]byte, error) {
-	// todo: impl this or change the snapshot format to rdb|aof
-	return json.Marshal(map[string]string{"cmd1": "cmd1value"})
+	// todo: change the snapshot format to rdb|aof
+	return json.Marshal(m.db.KeyVals())
 }
