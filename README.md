@@ -6,9 +6,11 @@
 
 
 (https://goreportcard.com/report/github.com/innovationb1ue/RedisGO)  
-**RedisGO** is a high-performance standalone cache server written by GO. It reaches peak performance for the original C-Redis  
+**RedisGO** is a high-performance distributed cache server written by GO. 
+It use [Raft](https://raft.github.io/) for consensus and fault tolerance. 
+It also reaches peak performance for the original C-Redis  
 It implemented full [RESP](https://redis.io/docs/reference/protocol-spec/)(Redis Serialization Protocol), so it supports
-all Redis clients.
+all standard Redis clients.
 
 ## Base Works
 The codebase is adapted from this version of
@@ -24,12 +26,13 @@ The codebase is adapted from this version of
 * Dedicate memory usage. (C-Redis is not able to release any allocated memory, but we can!)
 * Full in-memory storage
 * Concurrent safe. 
+* Distributed cluster and high consistency. 
 
 ## TODO
 + [x] Stream support
 + [ ] RDB persistence
 + [ ] AOF persistence
-+ [ ] Cluster Mode(with [Raft Algorithm](https://raft.github.io/) and higher level of write safety than C-Redis)
++ [x] Cluster Mode(with [Raft Algorithm](https://raft.github.io/) and higher level of write safety than C-Redis)
 + [ ] Master-Slave
 
 ## Usage
