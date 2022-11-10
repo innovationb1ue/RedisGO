@@ -16,6 +16,7 @@ package raftexample
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -38,13 +39,17 @@ import (
 )
 
 type RaftCommit struct {
-	Data       []string
+	Data       []*RaftProposal
 	ApplyDoneC chan<- struct{}
+}
+type RaftProposal struct {
+	Data string `json:"Data"`
+	ID   string `json:"ID"`
 }
 
 // RaftNode A key-value stream backed by raft
 type RaftNode struct {
-	proposeC    <-chan string            // proposed messages (k,v)
+	proposeC    <-chan *RaftProposal     // proposed messages (k,v)
 	confChangeC <-chan raftpb.ConfChange // proposed cluster config changes
 	commitC     chan<- *RaftCommit       // entries committed to log (k,v)
 	errorC      chan<- error             // errors from raft session
@@ -84,7 +89,7 @@ var defaultSnapshotCount uint64 = 10000
 // provided the proposal channel. All log entries are replayed over the
 // RaftCommit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
-func NewRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
+func NewRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan *RaftProposal,
 	confChangeC <-chan raftpb.ConfChange) (<-chan *RaftCommit, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *RaftCommit)
@@ -154,7 +159,7 @@ func (rc *RaftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 		return nil, true
 	}
 
-	data := make([]string, 0, len(ents))
+	data := make([]*RaftProposal, 0, len(ents))
 	for i := range ents {
 		switch ents[i].Type {
 		case raftpb.EntryNormal:
@@ -162,7 +167,11 @@ func (rc *RaftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 				// ignore empty messages
 				break
 			}
-			s := string(ents[i].Data)
+			var s = &RaftProposal{}
+			err := json.Unmarshal(ents[i].Data, s)
+			if err != nil {
+				panic(err)
+			}
 			data = append(data, s)
 		case raftpb.EntryConfChange:
 			var cc raftpb.ConfChange
@@ -420,12 +429,12 @@ func (rc *RaftNode) serveChannels() {
 
 		for rc.proposeC != nil && rc.confChangeC != nil {
 			select {
-			case prop, ok := <-rc.proposeC:
+			case proposal, ok := <-rc.proposeC:
 				if !ok {
 					rc.proposeC = nil
 				} else {
 					// blocks until accepted by raft state machine
-					rc.node.Propose(context.TODO(), []byte(prop))
+					rc.node.Propose(context.TODO(), proposal.ToBytes())
 				}
 
 			case cc, ok := <-rc.confChangeC:
@@ -520,4 +529,12 @@ func (rc *RaftNode) IsIDRemoved(id uint64) bool  { return false }
 func (rc *RaftNode) ReportUnreachable(id uint64) { rc.node.ReportUnreachable(id) }
 func (rc *RaftNode) ReportSnapshot(id uint64, status raft.SnapshotStatus) {
 	rc.node.ReportSnapshot(id, status)
+}
+
+func (p *RaftProposal) ToBytes() []byte {
+	res, err := json.Marshal(p)
+	if err != nil {
+		panic(err)
+	}
+	return res
 }

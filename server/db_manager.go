@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/innovationb1ue/RedisGO/config"
 	"github.com/innovationb1ue/RedisGO/logger"
 	"github.com/innovationb1ue/RedisGO/memdb"
@@ -159,7 +160,7 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- string, commitC <-chan *raftexample.RaftCommit) {
+func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- *raftexample.RaftProposal, callback map[string]chan resp.RedisData) {
 	// gracefully close the tcp connection to client
 	defer func() {
 		err := conn.Close()
@@ -197,9 +198,29 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 			// extract [][]bytes command
 			cmdStrings := arrayData.ToStringCommand()
 			// proposeC command to raft cluster
-			proposeC <- strings.Join(cmdStrings, " ")
-			// todo: fetch command state from leader and return response
-			conn.Write(resp.MakeStringData("OK received " + strings.Join(cmdStrings, " ")).ToBytes())
+			cmdID := uuid.NewString()
+			callback[cmdID] = make(chan resp.RedisData)
+			proposal := &raftexample.RaftProposal{
+				Data: strings.Join(cmdStrings, " "),
+				ID:   cmdID,
+			}
+			proposeC <- proposal
+			res := <-callback[cmdID]
+			delete(callback, cmdID)
+			// return result
+			if res != nil {
+				_, err := conn.Write(res.ToBytes())
+				if err != nil {
+					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
+				}
+			} else {
+				// return error
+				errData := resp.MakeErrorData("unknown error")
+				_, err := conn.Write(errData.ToBytes())
+				if err != nil {
+					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
+				}
+			}
 		case <-ctx.Done():
 			return
 		}

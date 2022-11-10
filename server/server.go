@@ -6,6 +6,7 @@ import (
 	"github.com/innovationb1ue/RedisGO/config"
 	"github.com/innovationb1ue/RedisGO/logger"
 	"github.com/innovationb1ue/RedisGO/raftexample"
+	"github.com/innovationb1ue/RedisGO/resp"
 	"go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
 	"log"
@@ -72,15 +73,17 @@ func Start(cfg *config.Config) error {
 	}()
 
 	// cluster logic here *******************
-	var proposeC chan string
+	var proposeC chan *raftexample.RaftProposal
 	var commitC <-chan *raftexample.RaftCommit
 	var errorC <-chan error
 	var snapshotterReady <-chan *snap.Snapshotter
 	var confChangeC chan raftpb.ConfChange
+	var resultCallback map[string]chan resp.RedisData
 	if cfg.IsCluster {
 		logger.Info("Initializing cluster node")
 		// send to proposeC to send message to raft cluster
-		proposeC = make(chan string)
+		proposeC = make(chan *raftexample.RaftProposal)
+		resultCallback = make(map[string]chan resp.RedisData)
 		defer close(proposeC)
 		confChangeC = make(chan raftpb.ConfChange)
 		defer close(confChangeC)
@@ -93,11 +96,15 @@ func Start(cfg *config.Config) error {
 		// handle cluster commits
 		go func() {
 			for msg := range commitC {
+				log.Println("commitC receive ", msg)
 				if msg == nil {
 					continue
 				}
 				for _, cmd := range msg.Data {
-					res := mgr.ExecStrCommand(ctx, cmd, nil)
+					res := mgr.ExecStrCommand(ctx, cmd.Data, nil)
+					if callback, ok := resultCallback[cmd.ID]; ok {
+						callback <- res
+					}
 					log.Println("cluster commitC: exec command ", msg.Data, "result = ", res)
 				}
 				close(msg.ApplyDoneC)
@@ -123,7 +130,7 @@ func Start(cfg *config.Config) error {
 				log.Println("start one worker")
 				// decide the right handler to process command
 				if cfg.IsCluster {
-					mgr.HandleCluster(ctx, conn, proposeC, commitC)
+					mgr.HandleCluster(ctx, conn, proposeC, resultCallback)
 				} else {
 					mgr.Handle(ctx, conn)
 				}
