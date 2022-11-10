@@ -172,6 +172,14 @@ func (r *ArrayData) ToCommand() [][]byte {
 	return res
 }
 
+func (r *ArrayData) ToStringCommand() []string {
+	res := make([]string, 0, len(r.data))
+	for _, v := range r.data {
+		res = append(res, string(v.ByteData()))
+	}
+	return res
+}
+
 // ByteData is discarded. Use ToCommand() instead.
 func (r *ArrayData) ByteData() []byte {
 	res := make([]byte, 0)

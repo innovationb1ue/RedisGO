@@ -2,6 +2,7 @@ package memdb
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net"
 	"strings"
@@ -125,4 +126,9 @@ func (m *MemDb) DelTTL(key string) int {
 	close(ttl.cancel)
 	// delete TTL key from cMap
 	return m.ttlKeys.Delete(key)
+}
+
+func (m *MemDb) GetSnapshot() ([]byte, error) {
+	// todo: change the snapshot format to rdb|aof
+	return json.Marshal(m.db.KeyVals())
 }

@@ -1,0 +1,60 @@
+name: Build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - linux-amd64
+          - linux-386
+          - darwin-amd64
+          - darwin-arm64
+          - windows-amd64
+          - linux-arm
+          - linux-arm64
+          - linux-ppc64le
+          - linux-s390x
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.19.3"
+      - env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          echo "${TARGET}"
+          case "${TARGET}" in
+            linux-amd64)
+              GOARCH=amd64 PASSES='build' ./scripts/test.sh
+              ;;
+            linux-386)
+              GOARCH=386 PASSES='build' ./scripts/test.sh
+              ;;
+            darwin-amd64)
+              GOARCH=amd64 GOOS=darwin GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            darwin-arm64)
+              GOARCH=arm64 GOOS=darwin GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            windows-amd64)
+              GOARCH=amd64 GOOS=windows GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            linux-arm)
+              GOARCH=arm GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            linux-arm64)
+              GOARCH=arm64 GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            linux-ppc64le)
+              GOARCH=ppc64le GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            linux-s390x)
+              GOARCH=s390x GO_BUILD_FLAGS='-v -mod=readonly' ./scripts/build.sh
+              ;;
+            *)
+              echo "Failed to find target"
+              exit 1
+              ;;
+          esac

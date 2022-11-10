@@ -4,3 +4,5 @@
 **/.VSCodeCounter
 *.log
 *.rdb
+*.tmp
+*.wal

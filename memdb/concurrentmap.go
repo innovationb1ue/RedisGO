@@ -126,6 +126,7 @@ func (m *ConcurrentMap) Clear() {
 	*m = *NewConcurrentMap(m.size)
 }
 
+// Keys return all stored keys in the concurrent map
 func (m *ConcurrentMap) Keys() []string {
 	keys := make([]string, m.count)
 	i := 0
@@ -138,4 +139,18 @@ func (m *ConcurrentMap) Keys() []string {
 		shard.rwMu.RUnlock()
 	}
 	return keys
+}
+
+func (m *ConcurrentMap) KeyVals() map[string]any {
+	res := make(map[string]any)
+	i := 0
+	for _, shard := range m.table {
+		shard.rwMu.RLock()
+		for k, v := range shard.item {
+			res[k] = v
+			i++
+		}
+		shard.rwMu.RUnlock()
+	}
+	return res
 }

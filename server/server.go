@@ -3,18 +3,23 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/innovationb1ue/RedisGO/config"
+	"github.com/innovationb1ue/RedisGO/logger"
+	"github.com/innovationb1ue/RedisGO/raftexample"
+	"github.com/innovationb1ue/RedisGO/resp"
+	"go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	"log"
 	"net"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
-
-	"github.com/innovationb1ue/RedisGO/config"
-	"github.com/innovationb1ue/RedisGO/logger"
 )
 
-// Start starts a simple redis server
+// Start starts a redis server and raft layer if in cluster mode
 func Start(cfg *config.Config) error {
 	// open tcp port
 	listener, err := net.Listen("tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
@@ -50,6 +55,7 @@ func Start(cfg *config.Config) error {
 	clients := make(chan net.Conn)
 	// create n db for SELECT cmd
 	mgr := NewManager(cfg)
+
 	// spawn a worker to accept tcp connections & create client objects
 	go func() {
 		for {
@@ -65,6 +71,50 @@ func Start(cfg *config.Config) error {
 			clients <- conn
 		}
 	}()
+
+	// cluster logic here *******************
+	var proposeC chan *raftexample.RaftProposal
+	var commitC <-chan *raftexample.RaftCommit
+	var errorC <-chan error
+	var snapshotterReady <-chan *snap.Snapshotter
+	var confChangeC chan raftpb.ConfChange
+	var resultCallback map[string]chan resp.RedisData
+	if cfg.IsCluster {
+		logger.Info("Initializing cluster node")
+		// send to proposeC to send message to raft cluster
+		proposeC = make(chan *raftexample.RaftProposal)
+		resultCallback = make(map[string]chan resp.RedisData)
+		defer close(proposeC)
+		confChangeC = make(chan raftpb.ConfChange)
+		defer close(confChangeC)
+		// start raft node
+		getSnapshot := func() ([]byte, error) { return mgr.CurrentDB.GetSnapshot() }
+		// read from commitC to update state machine
+		commitC, errorC, snapshotterReady = raftexample.NewRaftNode(cfg.NodeID, strings.Split(cfg.PeerAddrs, ","), false, getSnapshot, proposeC, confChangeC)
+		<-snapshotterReady
+
+		// handle cluster commits
+		go func() {
+			for msg := range commitC {
+				log.Println("commitC receive ", msg)
+				if msg == nil {
+					continue
+				}
+				for _, cmd := range msg.Data {
+					res := mgr.ExecStrCommand(ctx, cmd.Data, nil)
+					if callback, ok := resultCallback[cmd.ID]; ok {
+						callback <- res
+					}
+					log.Println("cluster commitC: exec command ", msg.Data, "result = ", res)
+				}
+				close(msg.ApplyDoneC)
+			}
+			if err, ok := <-errorC; ok {
+				log.Fatal(err)
+			}
+		}()
+	}
+
 	// server event loop
 	for {
 		select {
@@ -77,7 +127,13 @@ func Start(cfg *config.Config) error {
 			// start the worker goroutine
 			go func() {
 				defer wg.Done()
-				mgr.Handle(ctx, conn)
+				log.Println("start one worker")
+				// decide the right handler to process command
+				if cfg.IsCluster {
+					mgr.HandleCluster(ctx, conn, proposeC, resultCallback)
+				} else {
+					mgr.Handle(ctx, conn)
+				}
 			}()
 			wg.Add(1)
 		// exit server
@@ -87,7 +143,10 @@ func Start(cfg *config.Config) error {
 				isTerminating = true
 				return nil
 			}
+		// error in raft cluster
+		case <-errorC:
+			return nil
 		}
-	}
 
+	}
 }
