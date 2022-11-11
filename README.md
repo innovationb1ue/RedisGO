@@ -101,6 +101,15 @@ list
 (integer) -1
 ```
 
+## Cluster Mode
+
+Take a look at the files in `cluster_test` directory. 
+
+You only need to provide peer addresses(IP & Port) and a few other settings through json file. 
+
+To start a predefined 3 nodes cluster, run `cluster_test.sh` in `cluster_test` directory 
+and connect to one of the ports in (6380, 6381, 6382) or many of them with your redis-cli. 
+Then try out you favorite redis commands on different nodes. 
 
 ## Benchmark
 
