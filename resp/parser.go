@@ -250,6 +250,9 @@ func readLine(reader *bufio.Reader, state *readState) ([]byte, error) {
 func parseSingleLine(msg []byte) (RedisData, error) {
 	// msg is like "*This is a string. \r\n"
 	msgType := msg[0]
+	if len(msg) < 3 {
+		return nil, errors.New("msg too short")
+	}
 	// the actual string content without the first indicator and \r\n at the end
 	msgData := string(msg[1 : len(msg)-2])
 	var res RedisData
