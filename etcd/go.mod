@@ -7,8 +7,7 @@ replace (
 	go.etcd.io/etcd/client/pkg/v3 => ./client/pkg
 	go.etcd.io/etcd/client/v2 => ./client/v2
 	go.etcd.io/etcd/client/v3 => ./client/v3
-	go.etcd.io/etcd/etcdctl/v3 => ./etcdctl
-	go.etcd.io/etcd/etcdutl/v3 => ./etcdutl
+
 	go.etcd.io/etcd/pkg/v3 => ./pkg
 	go.etcd.io/etcd/raft/v3 => ./raft
 	go.etcd.io/etcd/server/v3 => ./server
