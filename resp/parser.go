@@ -251,7 +251,7 @@ func parseSingleLine(msg []byte) (RedisData, error) {
 	// msg is like "*This is a string. \r\n"
 	msgType := msg[0]
 	if len(msg) < 3 {
-		return nil, errors.New("msg too short")
+		return nil, errors.New("msg too short, possibly due to a http connection to redis port. ")
 	}
 	// the actual string content without the first indicator and \r\n at the end
 	msgData := string(msg[1 : len(msg)-2])
