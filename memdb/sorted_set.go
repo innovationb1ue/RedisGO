@@ -358,7 +358,35 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 	return resp.MakeArrayData(res)
 }
 
+func zrem(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisData {
+	if len(cmd) < 3 {
+		return resp.MakeWrongNumberArgs("zrem")
+	}
+	key := strings.ToLower(string(cmd[1]))
+	// retrive the key
+	m.locks.Lock(key)
+	defer m.locks.UnLock(key)
+	var sortedSet *SortedSet[*SortedSetNode]
+	sortedSetTmp, ok := m.db.Get(key)
+	if !ok {
+		return resp.MakeArrayData([]resp.RedisData{})
+	} else {
+		sortedSet, ok = sortedSetTmp.(*SortedSet[*SortedSetNode])
+		if !ok {
+			return resp.MakeWrongType()
+		}
+	}
+	res := sortedSet.Delete(string(cmd[2]))
+	if res != nil {
+		return resp.MakeIntData(1)
+	} else {
+		return resp.MakeIntData(0)
+	}
+
+}
+
 func RegisterSortedSetCommands() {
 	RegisterCommand("zadd", zadd)
 	RegisterCommand("zrange", zrange)
+	RegisterCommand("zrem", zrem)
 }
