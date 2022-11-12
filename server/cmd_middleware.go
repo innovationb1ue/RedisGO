@@ -32,7 +32,7 @@ func (m *middleware) Filter(cmd [][]byte) ([][]byte, error) {
 
 func ClusterCmdFilter(cmd [][]byte) ([][]byte, error) {
 	command := strings.ToLower(string(cmd[0]))
-	if command == "pub" || command == "sub" {
+	if command == "publish" || command == "subscribe" {
 		return nil, errors.New("does not support pub/sub in cluster mode yet. ")
 	}
 	return cmd, nil

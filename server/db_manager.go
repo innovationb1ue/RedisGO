@@ -160,7 +160,7 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- *raftexample.RaftProposal, callback map[string]chan resp.RedisData) {
+func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- *raftexample.RaftProposal, callback map[string]chan resp.RedisData, filter *middleware) {
 	// gracefully close the tcp connection to client
 	defer func() {
 		err := conn.Close()
@@ -196,6 +196,20 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 				continue
 			}
 			// extract [][]bytes command
+			cmd := arrayData.ToCommand()
+			// get command passed through filters
+			var err error
+			cmd, err = filter.Filter(cmd)
+			if err != nil {
+				logger.Error("filter error ", err)
+				// return error
+				errData := resp.MakeErrorData("command does not pass checks")
+				_, err := conn.Write(errData.ToBytes())
+				if err != nil {
+					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
+				}
+				continue
+			}
 			cmdStrings := arrayData.ToStringCommand()
 			// proposeC command to raft cluster
 			cmdID := uuid.NewString()

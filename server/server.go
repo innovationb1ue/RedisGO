@@ -79,6 +79,7 @@ func Start(cfg *config.Config) error {
 	var snapshotterReady <-chan *snap.Snapshotter
 	var confChangeC chan raftpb.ConfChange
 	var resultCallback map[string]chan resp.RedisData
+	var clusterFilter *middleware
 	if cfg.IsCluster {
 		logger.Info("Initializing cluster node")
 		// send to proposeC to send message to raft cluster
@@ -113,6 +114,9 @@ func Start(cfg *config.Config) error {
 				log.Fatal(err)
 			}
 		}()
+		// build cluster command filter
+		clusterFilter = newMiddleware()
+		clusterFilter.Add(ClusterCmdFilter)
 	}
 
 	// server event loop
@@ -130,7 +134,7 @@ func Start(cfg *config.Config) error {
 				log.Println("start one worker")
 				// decide the right handler to process command
 				if cfg.IsCluster {
-					mgr.HandleCluster(ctx, conn, proposeC, resultCallback)
+					mgr.HandleCluster(ctx, conn, proposeC, resultCallback, clusterFilter)
 				} else {
 					mgr.Handle(ctx, conn)
 				}
