@@ -384,12 +384,18 @@ func zrem(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisDat
 			return resp.MakeWrongType()
 		}
 	}
-	res := sortedSet.Delete(string(cmd[2]))
-	if res != nil {
-		return resp.MakeIntData(1)
-	} else {
-		return resp.MakeIntData(0)
+	keys := make([]string, 0, len(cmd)-2)
+	for _, s := range cmd[2:] {
+		keys = append(keys, string(s))
 	}
+	affectedCount := int64(0)
+	for _, k := range keys {
+		res := sortedSet.Delete(k)
+		if res != nil {
+			affectedCount++
+		}
+	}
+	return resp.MakeIntData(affectedCount)
 
 }
 

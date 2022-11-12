@@ -167,7 +167,7 @@ All commands are used as [redis commands](https://redis.io/commands/). You can u
 |---------|-------------|--------|-------------|--------------|-----------|------------|---------|
 | del     | set         | llen   | sadd        | hdel         | subscribe | zadd       | xadd*   |
 | exists  | get         | lindex | scard       | hexists      | publish   | zrange     | xrange* |
-| keys    | getrange    | lpos   | sdiff       | hget         |           |            |         |
+| keys    | getrange    | lpos   | sdiff       | hget         |           | zrem       |         |
 | expire  | setrange    | lpop   | sdirrstore  | hgetall      |           |            |         |
 | persist | mget        | rpop   | sinter      | hincrby      |           |            |         |
 | ttl     | mset        | lpush  | sinterstore | hincrbyfloat |           |            |         |
