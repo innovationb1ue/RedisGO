@@ -35,6 +35,14 @@ The codebase is adapted from this version of
 + [x] Cluster Mode(with [Raft Algorithm](https://raft.github.io/) and higher level of write safety than C-Redis)
 + [ ] Master-Slave
 
+## Contribute Guide
+
+It's highly recommanded to post an issue first and follow it by pull request. Feel free to post any valuable suggestions. 
+
+To start contributing, try to implement a simple command thats not on board already or help parsing some additional arguments for an existing command. The code style should be consistent with existing codes. Reference to other commands when writing up your commits. 
+
+You might want to find all redis commands [here](https://redis.io/commands/).  
+
 ## Usage
 Build RedisGO from source code:
 ```bash
