@@ -237,13 +237,21 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		}
 	}
 	// get set length
-	maxLen := sortedSet.Len()
-	if end > maxLen {
-		end = maxLen
+	NumOfMembers := sortedSet.Len()
+	if end > NumOfMembers {
+		end = NumOfMembers
 	}
 	// traverse btree for all elements , members are in ascend order
-	members := make([]*SortedSetMember, 0, maxLen)
+	members := make([]*SortedSetMember, 0, NumOfMembers)
+	memberCount := -1 // current member index
 	sortedSet.Ascend(func(node *Node[*SortedSetNode], int2 int) bool {
+		memberCount++
+		if memberCount < start {
+			return true
+		}
+		if memberCount > end {
+			return false
+		}
 		names := node.Value.GetNames()
 		score := node.Value.GetScore()
 		for n := range names {
@@ -305,7 +313,7 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 		}
 		// middle of members till the end. (idxStart got but idxEnd is missing, we assign End to max length)
 		if scoreIdxStart >= 0 && scoreIdxEnd == -1 {
-			scoreIdxEnd = maxLen
+			scoreIdxEnd = NumOfMembers
 		}
 		members = members[scoreIdxStart : scoreIdxEnd+1]
 		// build response if there is any member fall into the interval
@@ -351,7 +359,7 @@ func zrange(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisD
 			res = append(res, resp.MakeBulkData([]byte(fmt.Sprintf("%f", score))))
 		}
 	}
-	res = res[start:maxLen]
+	//res = res[start:NumOfMembers]
 	if rev {
 		res = reverse[[]resp.RedisData](res)
 	}
