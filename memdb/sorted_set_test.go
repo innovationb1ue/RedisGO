@@ -8,9 +8,15 @@ import (
 	"testing"
 )
 
+var m *MemDb
+var ctx context.Context
+
+func init() {
+	m = NewMemDb()
+	ctx = context.Background()
+}
+
 func TestZADD(t *testing.T) {
-	m := NewMemDb()
-	ctx := context.Background()
 	zadd(ctx, m, MakeCommandBytes("zadd a 555 hero"), nil)
 	zadd(ctx, m, MakeCommandBytes("zadd a 333 ggbob"), nil)
 	zadd(ctx, m, MakeCommandBytes("zadd a 444 jeff"), nil)
@@ -20,7 +26,9 @@ func TestZADD(t *testing.T) {
 	zadd(ctx, m, MakeCommandBytes("zadd a 999 ggbob"), nil)
 	zadd(ctx, m, MakeCommandBytes("zadd a 888 a1"), nil)
 	// -999 444 555 666 888 999 with a total of 6
+}
 
+func TestZRange(t *testing.T) {
 	// test zrange
 	res := zrange(ctx, m, MakeCommandBytes("zrange a 0 100 withscores"), nil)
 	resArr := res.(*resp.ArrayData)
