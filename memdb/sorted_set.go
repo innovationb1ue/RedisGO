@@ -371,7 +371,7 @@ func zrem(ctx context.Context, m *MemDb, cmd cmdBytes, _ net.Conn) resp.RedisDat
 		return resp.MakeWrongNumberArgs("zrem")
 	}
 	key := strings.ToLower(string(cmd[1]))
-	// retrive the key
+	// retrieve the key
 	m.locks.Lock(key)
 	defer m.locks.UnLock(key)
 	var sortedSet *SortedSet[*SortedSetNode]
