@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/innovationb1ue/RedisGO/blob/main/LICENSE)
 ![Go Report Card](https://goreportcard.com/badge/github.com/innovationb1ue/RedisGO)
-[![Go Reference](https://pkg.go.dev/badge/github.com/innovationb1ue/RedisGO#section-readme.svg)](https://pkg.go.dev/github.com/innovationb1ue/RedisGO#section-readme)
+![Go Reference](https://pkg.go.dev/badge/github.com/innovationb1ue/RedisGO#section-readme.svg)
 
 
 (https://goreportcard.com/report/github.com/innovationb1ue/RedisGO)  
