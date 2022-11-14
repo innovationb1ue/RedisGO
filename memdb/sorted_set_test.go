@@ -29,6 +29,8 @@ func TestZADD(t *testing.T) {
 }
 
 func TestZRange(t *testing.T) {
+	// need to make sure that we have put the correct values in it
+	TestZADD(t)
 	// test zrange
 	res := zrange(ctx, m, MakeCommandBytes("zrange a 0 100 withscores"), nil)
 	resArr := res.(*resp.ArrayData)
