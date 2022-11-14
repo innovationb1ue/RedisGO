@@ -27,7 +27,7 @@ func RegisterCommand(cmdName string, executor cmdExecutor) {
 	}
 }
 
-func MakeCommandBytes(input string) [][]byte {
+func MakeCommandBytes(input string) cmdBytes {
 	cmdStrs := strings.Split(input, " ")
 	cmds := make(cmdBytes, 0)
 	for _, c := range cmdStrs {
