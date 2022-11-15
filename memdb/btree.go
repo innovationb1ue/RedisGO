@@ -533,3 +533,24 @@ func (n *Node[T]) maxHeight() int64 {
 	}
 	return lh
 }
+
+func (t *Btree[T]) Rank(score float64) int64 {
+	return rank(t.root, score)
+}
+
+// rank finds the rank with the score in O(logn)
+// https://redis.io/commands/zrank/
+func rank[T Val](node *Node[T], score float64) int64 {
+	if node == nil {
+		return 0
+	}
+	if node.Value.GetScore() < score {
+		if node.left == nil {
+			return 1 + rank(node.right, score)
+		} else {
+			return 1 + node.left.height + rank(node.right, score)
+		}
+	} else {
+		return rank(node.left, score)
+	}
+}
