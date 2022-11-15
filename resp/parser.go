@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 
 	"github.com/innovationb1ue/RedisGO/logger"
@@ -50,22 +49,6 @@ func ReadAll(r io.Reader) ([]byte, error) {
 				err = nil
 			}
 			return b, err
-		}
-	}
-}
-
-func newParse(reader io.Reader, ch chan<- *ParsedRes) {
-	for {
-		// read all bytes
-		msg, err := ReadAll(reader)
-		if err != nil {
-			logger.Warning("ReadAll err", err)
-		}
-		log.Println("parse received message ", string(msg))
-
-		ch <- &ParsedRes{
-			Data: MakeBulkData(msg),
-			Err:  nil,
 		}
 	}
 }
