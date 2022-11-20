@@ -227,7 +227,7 @@ func renameKey(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.
 	return resp.MakeStringData("OK")
 }
 
-func pingKeys(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
+func pingKeys(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisData {
 	if len(cmd) > 2 {
 		return resp.MakeErrorData("error: wrong number of arguments for 'ping' command")
 	}
