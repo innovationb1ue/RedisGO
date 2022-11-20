@@ -20,6 +20,7 @@ func init() {
 	memdb.RegisterPubSubCommands()
 	memdb.RegisterSortedSetCommands()
 	memdb.RegisterStreamCommands()
+	memdb.RegisterRaftCommand()
 }
 
 func main() {

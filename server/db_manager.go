@@ -9,6 +9,7 @@ import (
 	"github.com/innovationb1ue/RedisGO/memdb"
 	"github.com/innovationb1ue/RedisGO/raftexample"
 	"github.com/innovationb1ue/RedisGO/resp"
+	"go.etcd.io/etcd/raft/v3/raftpb"
 	"io"
 	"net"
 	"strconv"
@@ -160,7 +161,7 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
-func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- *raftexample.RaftProposal, callback map[string]chan resp.RedisData, filter *middleware) {
+func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- *raftexample.RaftProposal, confChangeC chan<- raftpb.ConfChangeI, callback map[string]chan resp.RedisData, filter *middleware) {
 	// gracefully close the tcp connection to client
 	defer func() {
 		err := conn.Close()
@@ -175,6 +176,7 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 	for {
 		select {
 		case parsedRes := <-ch:
+			ctx = context.WithValue(ctx, "confChangeC", confChangeC)
 			// handle errors
 			if parsedRes.Err != nil {
 				if parsedRes.Err == io.EOF {

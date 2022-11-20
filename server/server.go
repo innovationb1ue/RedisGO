@@ -74,12 +74,13 @@ func Start(cfg *config.Config) error {
 
 	// cluster logic here *******************
 	var proposeC chan *raftexample.RaftProposal
+	var confChangeC chan raftpb.ConfChangeI
 	var commitC <-chan *raftexample.RaftCommit
 	var errorC <-chan error
 	var snapshotterReady <-chan *snap.Snapshotter
-	var confChangeC chan raftpb.ConfChangeI
 	var resultCallback map[string]chan resp.RedisData
 	var clusterFilter *middleware
+	var RaftNode *raftexample.RaftNode
 	if cfg.IsCluster {
 		logger.Info("Initializing cluster node")
 		// send to proposeC to send message to raft cluster
@@ -91,9 +92,9 @@ func Start(cfg *config.Config) error {
 		// start raft node
 		getSnapshot := func() ([]byte, error) { return mgr.CurrentDB.GetSnapshot() }
 		// read from commitC to update state machine
-		commitC, errorC, snapshotterReady = raftexample.NewRaftNode(cfg.NodeID, strings.Split(cfg.PeerAddrs, ","), false, getSnapshot, proposeC, confChangeC)
+		commitC, errorC, snapshotterReady, RaftNode = raftexample.NewRaftNode(cfg.NodeID, strings.Split(cfg.PeerAddrs, ","), false, getSnapshot, proposeC, confChangeC)
 		<-snapshotterReady
-
+		mgr.CurrentDB.Raft = RaftNode
 		// handle cluster commits
 		go func() {
 			for msg := range commitC {
@@ -134,7 +135,7 @@ func Start(cfg *config.Config) error {
 				log.Println("start one worker")
 				// decide the right handler to process command
 				if cfg.IsCluster {
-					mgr.HandleCluster(ctx, conn, proposeC, resultCallback, clusterFilter)
+					mgr.HandleCluster(ctx, conn, proposeC, confChangeC, resultCallback, clusterFilter)
 				} else {
 					mgr.Handle(ctx, conn)
 				}

@@ -3,6 +3,7 @@ package memdb
 import (
 	"context"
 	"encoding/json"
+	"github.com/innovationb1ue/RedisGO/raftexample"
 	"log"
 	"net"
 	"strings"
@@ -23,6 +24,7 @@ type MemDb struct {
 	ttlKeys  *ConcurrentMap
 	locks    *Locks
 	SubChans *ChanMap
+	Raft     *raftexample.RaftNode
 }
 
 func NewMemDb() *MemDb {
@@ -31,6 +33,7 @@ func NewMemDb() *MemDb {
 		ttlKeys:  NewConcurrentMap(config.Configures.ShardNum),
 		locks:    NewLocks(config.Configures.ShardNum * 2),
 		SubChans: NewChanMap(config.Configures.ShardNum),
+		Raft:     nil,
 	}
 }
 
