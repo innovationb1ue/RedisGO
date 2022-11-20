@@ -77,7 +77,7 @@ func Start(cfg *config.Config) error {
 	var commitC <-chan *raftexample.RaftCommit
 	var errorC <-chan error
 	var snapshotterReady <-chan *snap.Snapshotter
-	var confChangeC chan raftpb.ConfChange
+	var confChangeC chan raftpb.ConfChangeI
 	var resultCallback map[string]chan resp.RedisData
 	var clusterFilter *middleware
 	if cfg.IsCluster {
@@ -86,7 +86,7 @@ func Start(cfg *config.Config) error {
 		proposeC = make(chan *raftexample.RaftProposal)
 		resultCallback = make(map[string]chan resp.RedisData)
 		defer close(proposeC)
-		confChangeC = make(chan raftpb.ConfChange)
+		confChangeC = make(chan raftpb.ConfChangeI)
 		defer close(confChangeC)
 		// start raft node
 		getSnapshot := func() ([]byte, error) { return mgr.CurrentDB.GetSnapshot() }

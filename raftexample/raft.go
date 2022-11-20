@@ -49,10 +49,10 @@ type RaftProposal struct {
 
 // RaftNode A key-value stream backed by raft
 type RaftNode struct {
-	proposeC    <-chan *RaftProposal     // proposed messages (k,v)
-	confChangeC <-chan raftpb.ConfChange // proposed cluster config changes
-	commitC     chan<- *RaftCommit       // entries committed to log (k,v)
-	errorC      chan<- error             // errors from raft session
+	proposeC    <-chan *RaftProposal      // proposed messages (k,v)
+	confChangeC <-chan raftpb.ConfChangeI // proposed cluster config changes
+	commitC     chan<- *RaftCommit        // entries committed to log (k,v)
+	errorC      chan<- error              // errors from raft session
 
 	id          int      // client ID for raft session
 	peers       []string // raft peer URLs
@@ -90,7 +90,7 @@ var defaultSnapshotCount uint64 = 10000
 // RaftCommit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
 func NewRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan *RaftProposal,
-	confChangeC <-chan raftpb.ConfChange) (<-chan *RaftCommit, <-chan error, <-chan *snap.Snapshotter) {
+	confChangeC <-chan raftpb.ConfChangeI) (<-chan *RaftCommit, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *RaftCommit)
 	errorC := make(chan error)
@@ -442,7 +442,7 @@ func (rc *RaftNode) serveChannels() {
 					rc.confChangeC = nil
 				} else {
 					confChangeCount++
-					cc.ID = confChangeCount
+					//cc.ID = confChangeCount
 					rc.node.ProposeConfChange(context.TODO(), cc)
 				}
 			}
