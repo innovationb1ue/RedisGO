@@ -33,6 +33,7 @@ func rconf(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.Redi
 	return nil
 }
 
+// Member is designed to be a single arg command
 func Member(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	if strings.ToLower(string(cmd[1])) == "list" {
 		return MemberList(ctx, m, cmd, conn)
@@ -41,6 +42,7 @@ func Member(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.Red
 	}
 }
 
+// MemberList implementing 'list' option of Member command
 func MemberList(ctx context.Context, m *MemDb, cmd [][]byte, conn net.Conn) resp.RedisData {
 	node := m.Raft
 	if node == nil {
