@@ -5,7 +5,6 @@
 ![Go Reference](https://pkg.go.dev/badge/github.com/innovationb1ue/RedisGO#section-readme.svg)
 
 
-(https://goreportcard.com/report/github.com/innovationb1ue/RedisGO)  
 **RedisGO** is a high-performance distributed cache server written by GO. 
 It use [Raft](https://raft.github.io/) for consensus and fault tolerance. 
 It also reaches peak performance for the original C-Redis  
