@@ -573,6 +573,7 @@ type ConfChangeSingle struct {
 	NodeID uint64         `protobuf:"varint,2,opt,name=node_id,json=nodeId" json:"node_id"`
 }
 
+
 func (m *ConfChangeSingle) Reset()         { *m = ConfChangeSingle{} }
 func (m *ConfChangeSingle) String() string { return proto.CompactTextString(m) }
 func (*ConfChangeSingle) ProtoMessage()    {}

@@ -9,4 +9,4 @@ package raftexample
 //	}},
 //	Context: context.TODO(),
 //}
-// node.ProposeConfChange(context.TODO(), confChange)
+// Node.ProposeConfChange(context.TODO(), confChange)

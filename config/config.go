@@ -217,7 +217,9 @@ func (cfg *Config) ParseConfigJson(path string) error {
 	if err != nil {
 		return errors.New("Invalid config file fields. ")
 	}
-	cfg.RaftAddr = strings.Split(cfg.PeerAddrs, ",")[cfg.NodeID-1]
+	if cfg.RaftAddr == "" {
+		cfg.RaftAddr = strings.Split(cfg.PeerAddrs, ",")[cfg.NodeID-1]
+	}
 	log.Println("RaftAddr = ", cfg.RaftAddr)
 	// we only support a single database in cluster mode
 	cfg.Databases = 1

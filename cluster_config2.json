@@ -1,0 +1,9 @@
+{
+  "IsCluster": true,
+  "PeerAddrs": "http://127.0.0.1:16380,http://127.0.0.1:16390",
+  "RaftAddr": "",
+  "PeerIDs": "1,2",
+  "NodeID": 2,
+  "KVPort": 6383,
+  "JoinCluster": false
+}

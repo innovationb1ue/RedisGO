@@ -85,14 +85,14 @@ func Start(cfg *config.Config) error {
 		logger.Info("Initializing cluster node")
 		// send to proposeC to send message to raft cluster
 		proposeC = make(chan *raftexample.RaftProposal)
-		resultCallback = make(map[string]chan resp.RedisData)
-		defer close(proposeC)
 		confChangeC = make(chan raftpb.ConfChangeI)
+		defer close(proposeC)
 		defer close(confChangeC)
+		resultCallback = make(map[string]chan resp.RedisData)
 		// start raft node
 		getSnapshot := func() ([]byte, error) { return mgr.CurrentDB.GetSnapshot() }
 		// read from commitC to update state machine
-		commitC, errorC, snapshotterReady, RaftNode = raftexample.NewRaftNode(cfg.NodeID, strings.Split(cfg.PeerAddrs, ","), false, getSnapshot, proposeC, confChangeC)
+		commitC, errorC, snapshotterReady, RaftNode = raftexample.NewRaftNode(cfg.NodeID, cfg.RaftAddr, strings.Split(cfg.PeerAddrs, ","), cfg.JoinCluster, getSnapshot, proposeC, confChangeC)
 		<-snapshotterReady
 		mgr.CurrentDB.Raft = RaftNode
 		// handle cluster commits
@@ -100,9 +100,11 @@ func Start(cfg *config.Config) error {
 			for msg := range commitC {
 				log.Println("commitC receive ", msg)
 				if msg == nil {
+					log.Println("loaded empty snapshot")
 					continue
 				}
 				for _, cmd := range msg.Data {
+					ctx = context.WithValue(ctx, "confChangeC", confChangeC)
 					res := mgr.ExecStrCommand(ctx, cmd.Data, nil)
 					if callback, ok := resultCallback[cmd.ID]; ok {
 						callback <- res

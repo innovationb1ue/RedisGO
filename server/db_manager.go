@@ -176,7 +176,6 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 	for {
 		select {
 		case parsedRes := <-ch:
-			ctx = context.WithValue(ctx, "confChangeC", confChangeC)
 			// handle errors
 			if parsedRes.Err != nil {
 				if parsedRes.Err == io.EOF {
@@ -213,14 +212,29 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 				continue
 			}
 			cmdStrings := arrayData.ToStringCommand()
+
+			// confChange command
+			// todo: temporary workaround for confChange propose
+			if cmdStrings[0] == "rconf" {
+				ctx = context.WithValue(ctx, "confChangeC", confChangeC)
+				res := m.ExecCommand(ctx, cmd, conn)
+				_, err := conn.Write(res.ToBytes())
+				if err != nil {
+					logger.Error("write response to ", conn.RemoteAddr().String(), " error: ", err.Error())
+				}
+				continue
+			}
+
 			// proposeC command to raft cluster
 			cmdID := uuid.NewString()
 			callback[cmdID] = make(chan resp.RedisData)
+
 			proposal := &raftexample.RaftProposal{
 				Data: strings.Join(cmdStrings, " "),
 				ID:   cmdID,
 			}
 			proposeC <- proposal
+			// todo: this never return for newly joined node
 			res := <-callback[cmdID]
 			delete(callback, cmdID)
 			// return result

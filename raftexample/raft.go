@@ -56,7 +56,7 @@ type RaftNode struct {
 
 	id          int      // client ID for raft session
 	Peers       []string // raft peer URLs
-	join        bool     // node is joining an existing cluster
+	join        bool     // Node is joining an existing cluster
 	waldir      string   // path to WAL directory
 	snapdir     string   // path to snapshot directory
 	getSnapshot func() ([]byte, error)
@@ -66,7 +66,7 @@ type RaftNode struct {
 	appliedIndex  uint64
 
 	// raft backing for the RaftCommit/error channel
-	node        raft.Node
+	Node        raft.Node
 	raftStorage *raft.MemoryStorage
 	wal         *wal.WAL
 
@@ -89,7 +89,7 @@ var defaultSnapshotCount uint64 = 10000
 // provided the proposal channel. All log entries are replayed over the
 // RaftCommit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
-func NewRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan *RaftProposal,
+func NewRaftNode(id int, addr string, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan *RaftProposal,
 	confChangeC <-chan raftpb.ConfChangeI) (<-chan *RaftCommit, <-chan error, <-chan *snap.Snapshotter, *RaftNode) {
 
 	commitC := make(chan *RaftCommit)
@@ -116,7 +116,7 @@ func NewRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, 
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 		// rest of structure populated after WAL replay
 	}
-	go rc.startRaft()
+	go rc.startRaft(addr)
 	return commitC, errorC, rc.snapshotterReady, rc
 }
 
@@ -176,11 +176,12 @@ func (rc *RaftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 		case raftpb.EntryConfChange:
 			var cc raftpb.ConfChange
 			cc.Unmarshal(ents[i].Data)
-			rc.confState = *rc.node.ApplyConfChange(cc)
+			rc.confState = *rc.Node.ApplyConfChange(cc)
 			switch cc.Type {
 			case raftpb.ConfChangeAddNode:
 				if len(cc.Context) > 0 {
-					rc.transport.AddPeer(types.ID(cc.NodeID), []string{string(cc.Context)})
+					peerURL := string(cc.Context)
+					rc.transport.AddPeer(types.ID(cc.NodeID), []string{peerURL})
 				}
 			case raftpb.ConfChangeRemoveNode:
 				if cc.NodeID == uint64(rc.id) {
@@ -188,7 +189,10 @@ func (rc *RaftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 					return nil, false
 				}
 				rc.transport.RemovePeer(types.ID(cc.NodeID))
+				rc.Peers = append(rc.Peers[:cc.NodeID], rc.Peers[cc.NodeID+1:]...)
 			}
+		case raftpb.EntryConfChangeV2:
+			panic("V2 confChange handler not implemented ")
 		}
 	}
 
@@ -277,10 +281,10 @@ func (rc *RaftNode) writeError(err error) {
 	close(rc.commitC)
 	rc.errorC <- err
 	close(rc.errorC)
-	rc.node.Stop()
+	rc.Node.Stop()
 }
 
-func (rc *RaftNode) startRaft() {
+func (rc *RaftNode) startRaft(addr string) {
 	if !fileutil.Exist(rc.snapdir) {
 		if err := os.Mkdir(rc.snapdir, 0750); err != nil {
 			log.Fatalf("raftexample: cannot create dir for snapshot (%v)", err)
@@ -310,9 +314,11 @@ func (rc *RaftNode) startRaft() {
 	}
 
 	if oldwal || rc.join {
-		rc.node = raft.RestartNode(c)
+		rc.Node = raft.RestartNode(c)
+	} else if len(rpeers) == 0 {
+		rc.Node = raft.StartNode(c, nil)
 	} else {
-		rc.node = raft.StartNode(c, rpeers)
+		rc.Node = raft.StartNode(c, rpeers)
 	}
 
 	rc.transport = &rafthttp.Transport{
@@ -327,12 +333,13 @@ func (rc *RaftNode) startRaft() {
 
 	rc.transport.Start()
 	for i := range rc.Peers {
-		if i+1 != rc.id {
+		// exclude self
+		if i+1 != rc.id && rc.Peers[i] != "" {
 			rc.transport.AddPeer(types.ID(i+1), []string{rc.Peers[i]})
 		}
 	}
 
-	go rc.serveRaft()
+	go rc.serveRaft(addr)
 	go rc.serveChannels()
 }
 
@@ -341,7 +348,7 @@ func (rc *RaftNode) stop() {
 	rc.stopHTTP()
 	close(rc.commitC)
 	close(rc.errorC)
-	rc.node.Stop()
+	rc.Node.Stop()
 }
 
 func (rc *RaftNode) stopHTTP() {
@@ -434,7 +441,7 @@ func (rc *RaftNode) serveChannels() {
 					rc.proposeC = nil
 				} else {
 					// blocks until accepted by raft state machine
-					rc.node.Propose(context.TODO(), proposal.ToBytes())
+					rc.Node.Propose(context.TODO(), proposal.ToBytes())
 				}
 
 			case cc, ok := <-rc.confChangeC:
@@ -442,8 +449,10 @@ func (rc *RaftNode) serveChannels() {
 					rc.confChangeC = nil
 				} else {
 					confChangeCount++
-					//cc.ID = confChangeCount
-					rc.node.ProposeConfChange(context.TODO(), cc)
+					err := rc.Node.ProposeConfChange(context.TODO(), cc)
+					if err != nil {
+						log.Fatal("propose conf change err: ", err)
+					}
 				}
 			}
 		}
@@ -455,10 +464,10 @@ func (rc *RaftNode) serveChannels() {
 	for {
 		select {
 		case <-ticker.C:
-			rc.node.Tick()
+			rc.Node.Tick()
 
 		// store raft entries to wal, then publish over RaftCommit channel
-		case rd := <-rc.node.Ready():
+		case rd := <-rc.Node.Ready():
 			// Must save the snapshot file and WAL snapshot entry before saving any other entries
 			// or hardstate to ensure that recovery after a snapshot restore is possible.
 			if !raft.IsEmptySnap(rd.Snapshot) {
@@ -477,7 +486,7 @@ func (rc *RaftNode) serveChannels() {
 				return
 			}
 			rc.maybeTriggerSnapshot(applyDoneC)
-			rc.node.Advance()
+			rc.Node.Advance()
 
 		case err := <-rc.transport.ErrorC:
 			rc.writeError(err)
@@ -502,8 +511,8 @@ func (rc *RaftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
 	return ms
 }
 
-func (rc *RaftNode) serveRaft() {
-	url, err := url.Parse(rc.Peers[rc.id-1])
+func (rc *RaftNode) serveRaft(addr string) {
+	url, err := url.Parse(addr)
 	if err != nil {
 		log.Fatalf("raftexample: Failed parsing URL (%v)", err)
 	}
@@ -523,12 +532,12 @@ func (rc *RaftNode) serveRaft() {
 }
 
 func (rc *RaftNode) Process(ctx context.Context, m raftpb.Message) error {
-	return rc.node.Step(ctx, m)
+	return rc.Node.Step(ctx, m)
 }
 func (rc *RaftNode) IsIDRemoved(id uint64) bool  { return false }
-func (rc *RaftNode) ReportUnreachable(id uint64) { rc.node.ReportUnreachable(id) }
+func (rc *RaftNode) ReportUnreachable(id uint64) { rc.Node.ReportUnreachable(id) }
 func (rc *RaftNode) ReportSnapshot(id uint64, status raft.SnapshotStatus) {
-	rc.node.ReportSnapshot(id, status)
+	rc.Node.ReportSnapshot(id, status)
 }
 
 func (p *RaftProposal) ToBytes() []byte {

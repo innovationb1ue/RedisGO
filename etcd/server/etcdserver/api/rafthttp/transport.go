@@ -16,6 +16,7 @@ package rafthttp
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -310,6 +311,7 @@ func (t *Transport) AddPeer(id types.ID, us []string) {
 	}
 	fs := t.LeaderStats.Follower(id.String())
 	t.peers[id] = startPeer(t, urls, id, fs)
+	log.Println("now peers = ", t.peers)
 	addPeerToProber(t.Logger, t.pipelineProber, id.String(), us, RoundTripperNameSnapshot, rttSec)
 	addPeerToProber(t.Logger, t.streamProber, id.String(), us, RoundTripperNameRaftMessage, rttSec)
 

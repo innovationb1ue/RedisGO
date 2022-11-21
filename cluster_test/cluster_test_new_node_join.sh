@@ -1,0 +1,1 @@
+./RedisGO --IsCluster=true --ClusterConfigPath="./cluster_config3.json" --config="./redis3.conf"
