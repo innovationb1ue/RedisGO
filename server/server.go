@@ -95,28 +95,7 @@ func Start(cfg *config.Config) error {
 		commitC, errorC, snapshotterReady, RaftNode = raftexample.NewRaftNode(cfg.NodeID, cfg.RaftAddr, strings.Split(cfg.PeerAddrs, ","), cfg.JoinCluster, getSnapshot, proposeC, confChangeC)
 		<-snapshotterReady
 		mgr.CurrentDB.Raft = RaftNode
-		// handle cluster commits
-		go func() {
-			for msg := range commitC {
-				log.Println("commitC receive ", msg)
-				if msg == nil {
-					log.Println("loaded empty snapshot")
-					continue
-				}
-				for _, cmd := range msg.Data {
-					ctx = context.WithValue(ctx, "confChangeC", confChangeC)
-					res := mgr.ExecStrCommand(ctx, cmd.Data, nil)
-					if callback, ok := resultCallback[cmd.ID]; ok {
-						callback <- res
-					}
-					log.Println("cluster commitC: exec command ", msg.Data, "result = ", res)
-				}
-				close(msg.ApplyDoneC)
-			}
-			if err, ok := <-errorC; ok {
-				log.Fatal(err)
-			}
-		}()
+		go handleClusterCommits(ctx, commitC, confChangeC, mgr, resultCallback, errorC)
 		// build cluster command filter
 		clusterFilter = newMiddleware()
 		clusterFilter.Add(ClusterCmdFilter)
@@ -155,5 +134,27 @@ func Start(cfg *config.Config) error {
 			return nil
 		}
 
+	}
+}
+
+func handleClusterCommits(ctx context.Context, commitC <-chan *raftexample.RaftCommit, confChangeC chan<- raftpb.ConfChangeI, dbMgr *Manager, resultCallback map[string]chan resp.RedisData, errorC <-chan error) {
+	for msg := range commitC {
+		log.Println("commitC receive ", msg)
+		if msg == nil {
+			log.Println("loaded empty snapshot")
+			continue
+		}
+		for _, cmd := range msg.Data {
+			ctx = context.WithValue(ctx, "confChangeC", confChangeC)
+			res := dbMgr.ExecStrCommand(ctx, cmd.Data, nil)
+			if callback, ok := resultCallback[cmd.ID]; ok {
+				callback <- res
+			}
+			log.Println("cluster commitC: exec command ", msg.Data, "result = ", res)
+		}
+		close(msg.ApplyDoneC)
+	}
+	if err, ok := <-errorC; ok {
+		log.Fatal(err)
 	}
 }
