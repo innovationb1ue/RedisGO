@@ -192,7 +192,25 @@ func (rc *RaftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 				rc.Peers = append(rc.Peers[:cc.NodeID], rc.Peers[cc.NodeID+1:]...)
 			}
 		case raftpb.EntryConfChangeV2:
-			panic("V2 confChange handler not implemented ")
+			var cc raftpb.ConfChangeV2
+			cc.Unmarshal(ents[i].Data)
+			rc.confState = *rc.Node.ApplyConfChange(cc)
+			for _, change := range cc.Changes {
+				switch change.Type {
+				case raftpb.ConfChangeAddNode:
+					if len(cc.Context) > 0 {
+						peerURL := string(cc.Context)
+						rc.transport.AddPeer(types.ID(change.NodeID), []string{peerURL})
+					}
+				case raftpb.ConfChangeRemoveNode:
+					if change.NodeID == uint64(rc.id) {
+						log.Println("I've been removed from the cluster! Shutting down.")
+						return nil, false
+					}
+					rc.transport.RemovePeer(types.ID(change.NodeID))
+					rc.Peers = append(rc.Peers[:change.NodeID], rc.Peers[change.NodeID+1:]...)
+				}
+			}
 		}
 	}
 

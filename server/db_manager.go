@@ -161,6 +161,7 @@ func (m *Manager) Select(cmd [][]byte) resp.RedisData {
 	return resp.MakeStringData("OK")
 }
 
+// HandleCluster handle the client commands from cli (tcp connection stream).
 func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC chan<- *raftexample.RaftProposal, confChangeC chan<- raftpb.ConfChangeI, callback map[string]chan resp.RedisData, filter *middleware) {
 	// gracefully close the tcp connection to client
 	defer func() {
@@ -172,6 +173,7 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 	// create a goroutine that reads from the client and pump data into ch
 	ch := resp.ParseStream(ctx, conn)
 
+	ctx = context.WithValue(ctx, "confChangeC", confChangeC)
 	// parsedRes is a complete command read from client
 	for {
 		select {
@@ -215,8 +217,8 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 
 			// confChange command
 			// todo: temporary workaround for confChange propose
+			// might treat the rconf command as a normal command and wait for master to accept it and return response
 			if cmdStrings[0] == "rconf" {
-				ctx = context.WithValue(ctx, "confChangeC", confChangeC)
 				res := m.ExecCommand(ctx, cmd, conn)
 				_, err := conn.Write(res.ToBytes())
 				if err != nil {
@@ -228,13 +230,13 @@ func (m *Manager) HandleCluster(ctx context.Context, conn net.Conn, proposeC cha
 			// proposeC command to raft cluster
 			cmdID := uuid.NewString()
 			callback[cmdID] = make(chan resp.RedisData)
-
+			// todo: decide which command needs to be proposed to cluster
+			// For example, query command does not need to be proposed.
 			proposal := &raftexample.RaftProposal{
 				Data: strings.Join(cmdStrings, " "),
 				ID:   cmdID,
 			}
 			proposeC <- proposal
-			// todo: this never return for newly joined node
 			res := <-callback[cmdID]
 			delete(callback, cmdID)
 			// return result
