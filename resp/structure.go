@@ -3,6 +3,7 @@ package resp
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // todo:make shared string objects to optimize running speed.
@@ -16,6 +17,7 @@ var (
 type RedisData interface {
 	ToBytes() []byte  // return resp transfer format data
 	ByteData() []byte // return byte data
+	String() string   // return resp string
 }
 
 type StringData struct {
@@ -49,12 +51,6 @@ func MakeBulkData(data []byte) *BulkData {
 	}
 }
 
-//func MakeNullBulkData() *BulkData {
-//	return &BulkData{
-//		data: []byte{},
-//	}
-//}
-
 func (r *BulkData) ToBytes() []byte {
 	// return nil
 	if r.data == nil {
@@ -70,6 +66,10 @@ func (r *BulkData) Data() []byte {
 
 func (r *BulkData) ByteData() []byte {
 	return r.data
+}
+
+func (r *BulkData) String() string {
+	return string(r.data)
 }
 
 func MakeStringData(data string) *StringData {
@@ -89,6 +89,10 @@ func (r *StringData) ByteData() []byte {
 	return []byte(r.data)
 }
 
+func (r *StringData) String() string {
+	return r.data
+}
+
 func MakeIntData(data int64) *IntData {
 	return &IntData{
 		data: data,
@@ -105,6 +109,10 @@ func (r *IntData) Data() int64 {
 
 func (r *IntData) ByteData() []byte {
 	return []byte(strconv.FormatInt(r.data, 10))
+}
+
+func (r *IntData) String() string {
+	return strconv.FormatInt(r.data, 10)
 }
 
 func MakeErrorData(data ...string) *ErrorData {
@@ -135,6 +143,10 @@ func (r *ErrorData) Error() string {
 
 func (r *ErrorData) ByteData() []byte {
 	return []byte(r.data)
+}
+
+func (r *ErrorData) String() string {
+	return r.data
 }
 
 func MakeArrayData(data []RedisData) *ArrayData {
@@ -180,6 +192,10 @@ func (r *ArrayData) ToStringCommand() []string {
 	return res
 }
 
+func (r *ArrayData) String() string {
+	return strings.Join(r.ToStringCommand(), " ")
+}
+
 // ByteData is discarded. Use ToCommand() instead.
 func (r *ArrayData) ByteData() []byte {
 	res := make([]byte, 0)
@@ -198,6 +214,10 @@ func (r *PlainData) ToBytes() []byte {
 	return []byte(r.data + CRLF)
 }
 func (r *PlainData) Data() string {
+	return r.data
+}
+
+func (r *PlainData) String() string {
 	return r.data
 }
 

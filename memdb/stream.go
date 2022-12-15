@@ -2,10 +2,11 @@ package memdb
 
 import (
 	"context"
-	"github.com/innovationb1ue/RedisGO/resp"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/innovationb1ue/RedisGO/resp"
 )
 
 func xadd(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisData {
@@ -198,16 +199,28 @@ func xrange(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisD
 	}
 	key := string(cmd[1])
 	var start, end *StreamID
+	start = &StreamID{}
+	end = &StreamID{}
+	// the first entry idx
 	if string(cmd[2]) == "-" {
-		start = &StreamID{
-			time:   -1,
-			seqNum: -1,
+		start.time = -1
+		start.seqNum = -1
+	} else {
+		// todo: handle start timestamp and seqnum here.
+		err := start.Parse(string(cmd[2]))
+		if err != nil {
+			return resp.MakeErrorData(err.Error())
 		}
 	}
+	// the last entry idx
 	if string(cmd[3]) == "+" {
-		end = &StreamID{
-			time:   -1,
-			seqNum: -1,
+		end.time = -1
+		end.seqNum = -1
+	} else {
+		// todo: handle start timestamp and seqnum here.
+		err := end.Parse(string(cmd[3]))
+		if err != nil {
+			return resp.MakeErrorData(err.Error())
 		}
 	}
 	m.locks.Lock(key)
@@ -226,7 +239,7 @@ func xrange(ctx context.Context, m *MemDb, cmd [][]byte, _ net.Conn) resp.RedisD
 		}
 	}
 	ids, entries := stream.Range(start, end)
-	if ids != nil && entries != nil && len(ids) == len(entries) {
+	if ids != nil && entries != nil && len(ids) == len(entries) && len(ids) != 0 {
 		res := make([]resp.RedisData, 0, len(ids))
 		for i := 0; i < len(ids); i++ {
 			idData := resp.MakeStringData(ids[i].Format())

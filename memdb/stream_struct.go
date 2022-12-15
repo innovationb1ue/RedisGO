@@ -3,6 +3,8 @@ package memdb
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,7 +16,7 @@ type StreamID struct {
 
 type Stream struct {
 	entry      map[string][]string // message is bulk of strings
-	timeStamps []*StreamID
+	timeStamps []*StreamID         // ordered IDs
 	lock       sync.RWMutex
 }
 
@@ -29,13 +31,13 @@ func NewStream() *Stream {
 
 // AddEntry perform O(1) inserting
 func (s *Stream) AddEntry(ID *StreamID, val []string) error {
+	// lock map
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	// auto determine timestamp if necessary
 	if ID.time == -1 {
 		ID.time = time.Now().UnixMilli()
 	}
-	// lock map
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	// first entry
 	if len(s.timeStamps) == 0 {
 		ID.seqNum = 0
@@ -43,16 +45,16 @@ func (s *Stream) AddEntry(ID *StreamID, val []string) error {
 		s.entry[ID.Format()] = val
 		return nil
 	}
-	// check top
+	// check top first part. lower timestamp => return error
 	top := s.timeStamps[len(s.timeStamps)-1]
-	if ID.time < top.time || (ID.time == top.time && top.seqNum >= ID.seqNum) {
+	if ID.time < top.time {
 		return errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
 	}
-	// larger ID
-	if ID.time == top.time {
+	// auto determine sequence number with same timestamp
+	if ID.time == top.time && ID.seqNum == -1 {
 		ID.seqNum = top.seqNum + 1
-	} else {
-		ID.seqNum = 0
+	} else if ID.time == top.time && ID.seqNum < top.seqNum {
+		return errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
 	}
 	s.timeStamps = append(s.timeStamps, ID)
 	s.entry[ID.Format()] = val
@@ -78,7 +80,25 @@ func (s *Stream) Range(start *StreamID, end *StreamID) ([]*StreamID, [][]string)
 		}
 		return s.timeStamps, msgs
 	}
-	return nil, nil
+	// normal case (linear search for the start and the end)
+	// complexity: O(n)
+	// can be optimized to O(nlogn) but further imprvement require data structure refactor.
+	flag := false
+	for _, k := range s.timeStamps {
+		// abort when exceeding maximum timestamp and not inf range
+		if k.time > end.time && end.time != -1 || (k.time == end.time && k.seqNum >= end.seqNum) {
+			break
+		}
+		// find the start
+		if k.time >= start.time && (k.seqNum >= start.seqNum || start.seqNum == -1) {
+			flag = true
+		}
+		if flag {
+			msgs = append(msgs, s.entry[fmt.Sprintf("%d-%d", k.time, k.seqNum)])
+			IDs = append(IDs, k)
+		}
+	}
+	return IDs, msgs
 }
 
 func (s *Stream) DropFirst() int {
@@ -125,4 +145,28 @@ func (i *StreamID) Format() string {
 
 func (i *StreamID) GreaterEqual(ID *StreamID) bool {
 	return i.time >= ID.time && i.seqNum >= ID.seqNum
+}
+
+// Parse read the string as a timestamp string like "1671073232746-0" into StreamID struct.
+func (i *StreamID) Parse(text string) error {
+	trunks := strings.Split(text, "-")
+	var err error
+	if len(trunks) > 2 {
+		return errors.New("ERR Invalid stream ID specified as stream command argument")
+	}
+	// first part
+	i.time, err = strconv.ParseInt(trunks[0], 10, 64)
+	if err != nil {
+		return errors.New("ERR Invalid stream ID specified as stream command argument")
+	}
+	// sequence number part
+	if len(trunks) == 2 {
+		i.seqNum, err = strconv.ParseInt(trunks[1], 10, 64)
+		if err != nil {
+			return errors.New("ERR Invalid stream ID specified as stream command argument")
+		}
+	} else {
+		i.seqNum = 0
+	}
+	return nil
 }
