@@ -6,3 +6,7 @@
 *.rdb
 *.tmp
 *.wal
+
+# build binaries
+RedisGO
+oryxBuildBinary
