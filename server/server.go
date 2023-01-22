@@ -139,9 +139,9 @@ func Start(cfg *config.Config) error {
 
 func handleClusterCommits(ctx context.Context, commitC <-chan *raftexample.RaftCommit, confChangeC chan<- raftpb.ConfChangeI, dbMgr *Manager, resultCallback map[string]chan resp.RedisData, errorC <-chan error) {
 	for msg := range commitC {
-		log.Println("commitC receive ", msg)
+		logger.Info("commitC receive ", msg)
 		if msg == nil {
-			log.Println("loaded empty snapshot")
+			logger.Info("loaded empty snapshot")
 			continue
 		}
 		for _, cmd := range msg.Data {
@@ -155,6 +155,6 @@ func handleClusterCommits(ctx context.Context, commitC <-chan *raftexample.RaftC
 		close(msg.ApplyDoneC)
 	}
 	if err, ok := <-errorC; ok {
-		log.Fatal(err)
+		logger.Error(err)
 	}
 }
