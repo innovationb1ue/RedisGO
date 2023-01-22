@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/innovationb1ue/RedisGO/config"
@@ -27,18 +26,19 @@ func main() {
 	// setup config
 	cfg, err := config.Setup()
 	if err != nil {
-		fmt.Println(err.Error())
+		logger.Error(err)
 		os.Exit(1)
 	}
 	// setup logger
 	err = logger.SetUp(cfg)
 	if err != nil {
-		fmt.Println(err)
+		logger.Error(err)
 		os.Exit(1)
 	}
 	// setup tcp server
 	err = server.Start(cfg)
 	if err != nil {
+		logger.Error(err)
 		os.Exit(1)
 	}
 }
