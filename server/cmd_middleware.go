@@ -9,6 +9,9 @@ type middleware struct {
 	filters []func([][]byte) ([][]byte, error)
 }
 
+// filter function alias
+type filterFunc = func([][]byte) ([][]byte, error)
+
 // filter functions will get passed through before each command get executed
 // return the modified command and possible failure with an error
 func newMiddleware() *middleware {
@@ -17,6 +20,16 @@ func newMiddleware() *middleware {
 
 func (m *middleware) Add(f func([][]byte) ([][]byte, error)) {
 	m.filters = append(m.filters, f)
+}
+
+func (m *middleware) Delete(f filterFunc) bool {
+	for i, candidate := range m.filters {
+		if &f == &candidate {
+			m.filters = append(m.filters[:i], m.filters[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func (m *middleware) Filter(cmd [][]byte) ([][]byte, error) {
@@ -29,6 +42,11 @@ func (m *middleware) Filter(cmd [][]byte) ([][]byte, error) {
 	}
 	return cmd, err
 }
+
+// ***********************************
+// possibly write global filters below
+
+var Filters = []func(cmd [][]byte) ([][]byte, error){ClusterCmdFilter}
 
 func ClusterCmdFilter(cmd [][]byte) ([][]byte, error) {
 	command := strings.ToLower(string(cmd[0]))
