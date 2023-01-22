@@ -15,7 +15,6 @@ all standard Redis clients.
 The codebase is adapted from this version of
 [thinredis](https://github.com/VincentFF/thinredis/tree/86fa648426da7e9c3ff4c04aef1e43f1fdc7b1ac)
 
-
 ## Features
 
 * Support all Clients based on RESP protocol
@@ -33,6 +32,7 @@ The codebase is adapted from this version of
 + [ ] AOF persistence
 + [x] Cluster Mode(with [Raft Algorithm](https://raft.github.io/) and higher level of write safety than C-Redis)
 + [ ] Master-Slave
++ [ ] Add tests (Ongoing)
 
 ## Contribute Guide
 
