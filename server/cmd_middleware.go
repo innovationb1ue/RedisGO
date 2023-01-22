@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 )
 
@@ -24,7 +25,7 @@ func (m *middleware) Add(f func([][]byte) ([][]byte, error)) {
 
 func (m *middleware) Delete(f filterFunc) bool {
 	for i, candidate := range m.filters {
-		if &f == &candidate {
+		if reflect.ValueOf(f).Pointer() == reflect.ValueOf(candidate).Pointer() {
 			m.filters = append(m.filters[:i], m.filters[i+1:]...)
 			return true
 		}
