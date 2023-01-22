@@ -113,7 +113,6 @@ func Start(cfg *config.Config) error {
 			// start the worker goroutine
 			go func() {
 				defer wg.Done()
-				log.Println("start one worker")
 				// decide the right handler to process command
 				if cfg.IsCluster {
 					mgr.HandleCluster(ctx, conn, proposeC, confChangeC, resultCallback, clusterFilter)
