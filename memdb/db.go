@@ -18,7 +18,7 @@ import (
 // All key:value pairs are stored in db
 // All ttl keys are stored in ttlKeys
 // locks is used to lock a key for db to ensure some atomic operations
-// SubChans are a independent concurrent map of channel shards used in PUB/SUB commands
+// SubChans are an independent concurrent map of channel shards used in PUB/SUB commands
 type MemDb struct {
 	db       *ConcurrentMap
 	ttlKeys  *ConcurrentMap
