@@ -73,6 +73,8 @@ func Disable() {
 	logger.SetOutput(io.Discard)
 }
 
+// setPrefix add prefixes to log lines
+// currently it is like "[debug][goFilePath] {text}"
 func setPrefix(level LogLevel) {
 	_, file, line, ok := runtime.Caller(defaultCallerDepth)
 	if ok {
