@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-// todo:make shared string objects to optimize running speed.
 // template strings should only be allocated once at compile time.
 
 // this file implements data structure for resp
 var (
 	CRLF = "\r\n"
+	NIL  = []byte("$-1\r\n")
 )
 
 type RedisData interface {
@@ -54,7 +54,7 @@ func MakeBulkData(data []byte) *BulkData {
 func (r *BulkData) ToBytes() []byte {
 	// return nil
 	if r.data == nil {
-		return []byte("$-1\r\n")
+		return NIL
 	}
 	// return data string
 	return []byte("$" + strconv.Itoa(len(r.data)) + CRLF + string(r.data) + CRLF)
