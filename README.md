@@ -33,6 +33,7 @@ The codebase is adapted from this version of
 + [x] Cluster Mode(with [Raft Algorithm](https://raft.github.io/) and higher level of write safety than C-Redis)
 + [ ] Master-Slave
 + [ ] Add tests (Ongoing)
++ [ ] Transacton, Pipeline and Task Rollback (Ongoing) 
 
 ## Contribute Guide
 
